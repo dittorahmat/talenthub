@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { initCloudflareD1 } from './db'
 import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
@@ -24,6 +25,12 @@ export interface Env {
 const app = new Hono<{ Bindings: Env }>()
 
 app.use('*', cors())
+app.use('*', async (c, next) => {
+  if (c.env?.DB) {
+    initCloudflareD1(c.env.DB)
+  }
+  await next()
+})
 app.use('/api/*', orgMiddleware)
 
 app.get('/api/health', (c) => c.json({

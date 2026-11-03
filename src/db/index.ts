@@ -1,13 +1,14 @@
 import * as schema from './schema'
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 
 // Global container for Cloudflare D1 instance or fallback
 let currentDb: any = null
 let currentSqlite: any = null
 
 export function initCloudflareD1(d1Instance: any) {
-  // Dynamically load drizzle-orm/d1
-  const { drizzle } = require('drizzle-orm/d1')
-  currentDb = drizzle(d1Instance, { schema })
+  if (d1Instance) {
+    currentDb = drizzleD1(d1Instance, { schema })
+  }
 }
 
 // Transparent getter/proxy
