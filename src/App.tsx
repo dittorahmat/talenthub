@@ -96,51 +96,73 @@ export default function App() {
       return (
         <div style={{
           minHeight: '100vh',
-          background: '#0F172A',
-          color: 'white',
+          background: 'var(--ground)',
+          color: 'var(--text)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '24px',
-          fontFamily: 'system-ui, sans-serif'
+          fontFamily: 'var(--font-sans)'
         }}>
           <div style={{
-            background: '#1E293B',
-            padding: '32px',
-            borderRadius: '16px',
-            border: '1px solid #334155',
-            maxWidth: '440px',
-            textAlign: 'center'
+            background: 'var(--surface)',
+            padding: '40px',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--border)',
+            maxWidth: '460px',
+            textAlign: 'center',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px' }}>Akses Dibatasi</h2>
-            <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 24px', lineHeight: 1.5 }}>
-              Halaman ini hanya dapat diakses oleh akun dengan peran <strong>superadmin</strong>. Silakan masuk terlebih dahulu dengan kredensial superadmin.
+            <div style={{
+              display: 'inline-flex',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-control)',
+              background: 'var(--raised)',
+              border: '1px solid var(--border)',
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--muted)',
+              marginBottom: '16px'
+            }}>
+              Autentikasi Terbatas
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 10px', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+              Akses Khusus Superadmin
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--muted)', margin: '0 0 24px', lineHeight: 1.6 }}>
+              Halaman ini hanya dapat diakses oleh akun dengan peran <strong>superadmin</strong> resmi. Silakan masuk terlebih dahulu dengan kredensial yang sesuai.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
+                type="button"
                 onClick={() => { window.location.hash = '#/login' }}
                 style={{
-                  background: '#0D9488',
+                  background: 'var(--accent)',
                   color: 'white',
                   border: 'none',
-                  padding: '10px 18px',
-                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  borderRadius: 'var(--radius-control)',
                   fontWeight: 600,
+                  fontSize: '13px',
                   cursor: 'pointer'
                 }}
               >
                 Masuk via Login
               </button>
               <button
+                type="button"
                 onClick={() => { window.location.hash = '#/' }}
                 style={{
-                  background: '#334155',
-                  color: '#CBD5E1',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  padding: '10px 18px',
+                  borderRadius: 'var(--radius-control)',
+                  fontSize: '13px',
+                  fontWeight: 500,
                   cursor: 'pointer'
                 }}
               >
@@ -165,9 +187,9 @@ export default function App() {
     return (
       <div>
         {/* Workspace Top Navigation Bar */}
-        <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '10px 24px' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 32px' }}>
+          <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -177,21 +199,30 @@ export default function App() {
                   background: 'none',
                   border: 'none',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#475569',
+                  fontWeight: 500,
+                  color: 'var(--muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '6px',
+                  padding: 0
                 }}
               >
                 ← Beranda SaaS
               </button>
-              <span style={{ height: '14px', width: '1px', background: '#CBD5E1' }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>TalentHub</span>
-                <span style={{ fontSize: '11px', background: '#CCFBF1', color: '#0F766E', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
-                  Talent Intelligence
+              <span style={{ height: '14px', width: '1px', background: 'var(--border)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>TalentHub</span>
+                <span style={{
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  background: 'var(--pill-neutral-bg)',
+                  color: 'var(--pill-neutral-ink)',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border)'
+                }}>
+                  v2.4 · Cloudflare Native
                 </span>
               </div>
             </div>
@@ -199,39 +230,46 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {currentUser?.role === 'superadmin' && (
                 <button
+                  type="button"
                   onClick={() => {
                     window.location.hash = '#/superadmin'
                   }}
                   style={{
-                    background: '#EEF2FF',
-                    border: '1px solid #C7D2FE',
-                    color: '#4338CA',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text)',
                     fontSize: '12px',
-                    fontWeight: 700,
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-control)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
                   }}
                 >
-                  🛡️ Superadmin Panel
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--positive)' }} />
+                  Portal Superadmin
                 </button>
               )}
 
               {currentUser && (
-                <span style={{ fontSize: '13px', color: '#334155' }}>
-                  Halo, <strong>{currentUser.name}</strong> ({currentUser.role})
+                <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+                  Halo, <strong style={{ color: 'var(--text)' }}>{currentUser.name}</strong>
                 </span>
               )}
 
               <button
+                type="button"
                 onClick={handleLogout}
                 style={{
-                  background: '#F1F5F9',
-                  border: '1px solid #CBD5E1',
-                  color: '#475569',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
                   fontSize: '12px',
-                  padding: '5px 12px',
-                  borderRadius: '6px',
+                  fontWeight: 500,
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-control)',
                   cursor: 'pointer'
                 }}
               >

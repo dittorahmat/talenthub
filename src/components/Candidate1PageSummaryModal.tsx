@@ -241,7 +241,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
                 cursor: 'pointer'
               }}
             >
-              ✕
+              
             </button>
           </div>
         </div>

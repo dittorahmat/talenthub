@@ -18,7 +18,30 @@ function scanDirectory(dir, testFn) {
   }
 }
 
-// 1. Check for AI-slop inline styles, emojis, and isolated dark terminal theme on Superadmin Portal
+// 1. Check for AI-slop inline styles, emojis, and isolated dark terminal theme dynamically across all app components & pages
+scanDirectory(join(process.cwd(), 'src'), (filePath) => {
+  if (!filePath.endsWith('.tsx') && !filePath.endsWith('.ts')) return
+  const relPath = filePath.replace(process.cwd(), '').replace(/^[\\\/]/, '')
+  const content = readFileSync(filePath, 'utf-8')
+  const fileLines = content.split('\n')
+  fileLines.forEach((line, idx) => {
+    if (/[🛡️⚡🏢🔄🔒✕⚠]/u.test(line)) {
+      VIOLATIONS.push({
+        file: filePath,
+        line: idx + 1,
+        reason: `Decorative AI Emoji Slop Detected in ${relPath}. Wajib gunakan SVG semantik atau tipografi tegas.`
+      })
+    }
+    if (/#6366F1|border-indigo-200|bg-indigo-50/i.test(line)) {
+      VIOLATIONS.push({
+        file: filePath,
+        line: idx + 1,
+        reason: `AI Slop Color Palette (Purple/Indigo default) detected in ${relPath}. Wajib gunakan Light Slate & Teal.`
+      })
+    }
+  })
+})
+
 const superadminFile = join(process.cwd(), 'src/pages/SuperadminPortal.tsx')
 const superadminContent = readFileSync(superadminFile, 'utf-8')
 const lines = superadminContent.split('\n')
@@ -28,13 +51,6 @@ lines.forEach((line, idx) => {
       file: superadminFile,
       line: idx + 1,
       reason: 'AI Slop Inline Style Detected in SuperadminPortal: gunakan class utility Tailwind alih-alih inline styles.'
-    })
-  }
-  if (/[🛡️⚡🏢🔄]/u.test(line)) {
-    VIOLATIONS.push({
-      file: superadminFile,
-      line: idx + 1,
-      reason: 'Decorative AI Emoji Slop Detected in Superadmin portal.'
     })
   }
   if (/bg-slate-950/i.test(line) && !line.includes('// allow-dark')) {

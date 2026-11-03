@@ -326,7 +326,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
             onClick={onClose}
             style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#64748B', cursor: 'pointer' }}
           >
-            ✕
+            
           </button>
         </div>
 
@@ -555,7 +555,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
+                <span style={{ fontSize: '18px', flexShrink: 0 }}></span>
                 <div>
                   <strong>File tidak dapat dibaca / rusak.</strong> 1 Kredit telah dikembalikan ke dompet Anda. Silakan unggah ulang format PDF/DOCX yang valid.
                 </div>

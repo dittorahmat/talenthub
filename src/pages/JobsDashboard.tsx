@@ -88,76 +88,77 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', padding: '32px 24px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--ground)', padding: '40px 32px' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
-                width: 38,
-                height: 38,
-                borderRadius: '8px',
-                background: '#0D9488',
+                width: 36,
+                height: 36,
+                borderRadius: 'var(--radius-control)',
+                background: 'var(--accent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                fontWeight: 800,
-                fontSize: '18px'
+                fontWeight: 700,
+                fontSize: '16px',
+                fontFamily: 'var(--font-mono)'
               }}>
                 T
               </div>
-              <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
-                Talent<span style={{ color: '#0D9488' }}>Hub</span>
-              </h1>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em' }}>
+                  TalentHub
+                </h1>
+              </div>
             </div>
-            <p style={{ margin: '6px 0 0', color: '#64748B', fontSize: '14px' }}>
-              TalentHub oleh PT. Sirius Global Technologies
+            <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: '13px' }}>
+              TalentHub oleh PT. Sirius Global Technologies · Sistem Pelacakan & Skrining Pelamar
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <CreditPill />
             <WorkspaceSwitcher />
             <button
-            type="button"
-            aria-label="Buat lowongan baru"
-            onClick={() => setShowAddModal(true)}
-            style={{
-              background: '#0D9488',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)'
-            }}
-          >
-            <span aria-hidden="true">+</span> New Job
-          </button>
+              type="button"
+              aria-label="Buat lowongan baru"
+              onClick={() => setShowAddModal(true)}
+              style={{
+                background: 'var(--accent)',
+                color: 'white',
+                border: 'none',
+                padding: '10px 18px',
+                borderRadius: 'var(--radius-control)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              + Buat Lowongan Baru
+            </button>
           </div>
         </div>
 
         {/* Filter / Search Bar */}
         <div style={{
-          background: 'white',
-          padding: '16px 20px',
-          borderRadius: '12px',
-          border: '1px solid #E2E8F0',
+          background: 'var(--surface)',
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-card)',
+          border: '1px solid var(--border)',
           display: 'flex',
-          gap: '16px',
+          gap: '12px',
           alignItems: 'center',
-          marginBottom: '28px',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+          marginBottom: '28px'
         }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
-              <SearchIcon size={16} color="#94A3B8" />
+              <SearchIcon size={16} color="var(--muted)" />
             </span>
             <input
               type="text"
@@ -167,11 +168,13 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
               onChange={(e) => setSearch(e.target.value)}
               style={{
                 width: '100%',
-                padding: '10px 12px 10px 38px',
-                border: '1px solid #CBD5E1',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                padding: '9px 12px 9px 38px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-control)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+                background: 'var(--surface)',
+                color: 'var(--text)'
               }}
             />
           </div>
@@ -180,12 +183,12 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
             style={{
-              padding: '10px 14px',
-              border: '1px solid #CBD5E1',
-              borderRadius: '8px',
-              fontSize: '14px',
-              background: 'white',
-              color: '#334155',
+              padding: '9px 14px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-control)',
+              fontSize: '13px',
+              background: 'var(--surface)',
+              color: 'var(--text)',
               cursor: 'pointer'
             }}
           >
@@ -292,9 +295,12 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
                   type="button"
                   aria-label="Tutup modal"
                   onClick={() => setShowAddModal(false)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '20px', color: '#94A3B8', cursor: 'pointer', lineHeight: 1 }}
+                  style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                 >
-                  ✕
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
                 </button>
               </div>
 

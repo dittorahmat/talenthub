@@ -145,13 +145,13 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', fontSize: '20px', color: '#94A3B8', cursor: 'pointer' }}
           >
-            ✕
+            
           </button>
         </div>
 
         {error && (
           <div style={{ margin: '16px 24px 0', padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', color: '#991B1B', fontSize: '13px' }}>
-            ⚠️ {error}
+             {error}
           </div>
         )}
 
