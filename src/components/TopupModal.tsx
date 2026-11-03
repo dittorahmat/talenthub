@@ -169,12 +169,12 @@ export const TopupModal: React.FC<TopupModalProps> = ({
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid #E2E8F0',
+            borderBottom: '1px solid var(--border)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-            color: 'white',
+            background: 'var(--surface)',
+            color: 'var(--text)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -532,7 +532,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
                             top: '-10px',
                             left: '50%',
                             transform: 'translateX(-50%)',
-                            background: pkg.id === 'growth' ? '#0D9488' : '#6366F1',
+                            background: pkg.id === 'growth' ? '#0F172A' : '#334155',
                             color: 'white',
                             fontSize: '10px',
                             fontWeight: 700,
