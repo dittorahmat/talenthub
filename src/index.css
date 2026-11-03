@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   /* Achromatic ledger tokens (app workspace) */
   --ground: #f8f9fa;
