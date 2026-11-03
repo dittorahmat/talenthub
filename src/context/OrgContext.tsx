@@ -11,6 +11,7 @@ interface OrgContextType {
   currentOrg: Organization
   organizations: Organization[]
   setOrganizationId: (id: number) => void
+  refreshOrganizations: () => Promise<void>
   isLoading: boolean
 }
 
@@ -24,6 +25,7 @@ const OrgContext = createContext<OrgContextType>({
   currentOrg: DEFAULT_ORG,
   organizations: [DEFAULT_ORG],
   setOrganizationId: () => {},
+  refreshOrganizations: async () => {},
   isLoading: false,
 })
 
@@ -41,21 +43,23 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   })
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
+  const fetchOrganizations = async () => {
+    try {
+      const res = await fetch('/api/organizations')
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        setOrganizations(data)
+      }
+    } catch (err) {
+      console.error('Failed to load organizations', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Fetch organizations from API
   useEffect(() => {
-    fetch('/api/organizations')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setOrganizations(data)
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load organizations', err)
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
+    fetchOrganizations()
   }, [])
 
   const handleSetOrgId = (id: number) => {
@@ -72,6 +76,7 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentOrg,
       organizations,
       setOrganizationId: handleSetOrgId,
+      refreshOrganizations: fetchOrganizations,
       isLoading
     }}>
       {children}

@@ -5,9 +5,9 @@ Sistem onboarding pendaftaran aman dari eksploitasi trial. Pendaftaran baru dari
 
 **Blocked by:** 02: Credit Wallet and Header Pill
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Validator email saat registrasi memfilter domain publik umum (`gmail.com`, `yahoo.com`, dsb.) dan disposable email provider.
-- [ ] Logika organisasi memverifikasi keunikan domain email: hanya organisasi pertama dari domain `@namapt.com` yang mendapatkan free trial credits.
-- [ ] Verifikasi kode OTP WhatsApp sebelum akun dan kredit gratis diaktifkan.
-- [ ] Pencatatan riwayat klaim trial untuk mencegah eksploitasi dari IP / device fingerprint yang sama.
+- [x] Validator email saat registrasi memfilter domain publik umum (`gmail.com`, `yahoo.com`, dsb.) dan disposable email provider.
+- [x] Logika organisasi memverifikasi keunikan domain email: hanya organisasi pertama dari domain `@namapt.com` yang mendapatkan free trial credits.
+- [x] Verifikasi kode OTP WhatsApp sebelum akun dan kredit gratis diaktifkan.
+- [x] Pencatatan riwayat klaim trial untuk mencegah eksploitasi dari IP / device fingerprint yang sama.

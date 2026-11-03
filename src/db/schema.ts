@@ -35,6 +35,7 @@ export const applicants = sqliteTable('applicants', {
   screeningSummary: text('screening_summary'),
   screeningScore: integer('screening_score'),
   screeningBand: text('screening_band'),
+  screeningVerdict: text('screening_verdict'),
   screeningMatched: text('screening_matched'),
   screeningMissing: text('screening_missing'),
   screeningExpYears: integer('screening_exp_years'),
@@ -102,4 +103,34 @@ export const creditTransactions = sqliteTable('credit_transactions', {
   description: text('description'),
   balanceAfter: integer('balance_after').notNull(),
   createdAt: text('created_at').notNull(),
+})
+
+export const paymentInvoices = sqliteTable('payment_invoices', {
+  id: text('id').primaryKey(),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  packageId: text('package_id').notNull(),
+  packageName: text('package_name').notNull(),
+  credits: integer('credits').notNull(),
+  amountIdr: integer('amount_idr').notNull(),
+  paymentMethod: text('payment_method').notNull(),
+  paymentCode: text('payment_code').notNull(), // QRIS string or Virtual Account number
+  status: text('status').notNull().default('PENDING'), // PENDING | PAID | EXPIRED | FAILED
+  provider: text('provider').default('mock_midtrans'),
+  paidAt: text('paid_at'),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const trialClaims = sqliteTable('trial_claims', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+  corporateDomain: text('corporate_domain').notNull(),
+  adminEmail: text('admin_email').notNull(),
+  phoneWhatsapp: text('phone_whatsapp').notNull(),
+  otpCode: text('otp_code'),
+  otpExpiresAt: text('otp_expires_at'),
+  isVerified: integer('is_verified').notNull().default(0),
+  claimedAt: text('claimed_at'),
+  ipAddress: text('ip_address'),
 })

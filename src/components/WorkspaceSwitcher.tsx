@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useOrg } from '../context/OrgContext'
+import { TrialOnboardingModal } from './TrialOnboardingModal'
 
 export const WorkspaceSwitcher: React.FC = () => {
   const { currentOrg, organizations, setOrganizationId } = useOrg()
   const [isOpen, setIsOpen] = useState(false)
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export const WorkspaceSwitcher: React.FC = () => {
             position: 'absolute',
             top: 'calc(100% + 4px)',
             right: 0,
-            width: '230px',
+            width: '260px',
             background: 'white',
             borderRadius: '8px',
             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
@@ -106,7 +108,7 @@ export const WorkspaceSwitcher: React.FC = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                     <span
                       style={{
                         display: 'inline-flex',
@@ -119,19 +121,57 @@ export const WorkspaceSwitcher: React.FC = () => {
                         color: isActive ? '#15803D' : '#475569',
                         fontSize: '11px',
                         fontWeight: 700,
+                        flexShrink: 0,
                       }}
                     >
                       {org.name.charAt(0).toUpperCase()}
                     </span>
-                    <span>{org.name}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {org.name}
+                    </span>
                   </div>
-                  {isActive && <span style={{ color: '#16A34A', fontSize: '13px' }}>✓</span>}
+                  {isActive && <span style={{ color: '#16A34A', fontSize: '13px', marginLeft: '6px' }}>✓</span>}
                 </button>
               )
             })}
           </div>
+          <div style={{ borderTop: '1px solid #E2E8F0', padding: '6px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false)
+                setShowOnboardingModal(true)
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                border: '1px dashed #0284C7',
+                borderRadius: '6px',
+                background: '#F0F9FF',
+                color: '#0369A1',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <span>✨</span>
+              <span>Daftar Perusahaan Baru (Free Trial 20 Kredit)</span>
+            </button>
+          </div>
         </div>
       )}
+
+      <TrialOnboardingModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+        onSuccess={(newOrgId) => {
+          setOrganizationId(newOrgId)
+        }}
+      />
     </div>
   )
 }

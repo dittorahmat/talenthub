@@ -46,6 +46,7 @@ sqlite.exec(`
     screening_summary TEXT,
     screening_score INTEGER,
     screening_band TEXT,
+    screening_verdict TEXT,
     screening_matched TEXT,
     screening_missing TEXT,
     screening_exp_years INTEGER
@@ -113,6 +114,19 @@ sqlite.exec(`
     description TEXT,
     balance_after INTEGER NOT NULL,
     created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS trial_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+    corporate_domain TEXT NOT NULL,
+    admin_email TEXT NOT NULL,
+    phone_whatsapp TEXT NOT NULL,
+    otp_code TEXT,
+    otp_expires_at TEXT,
+    is_verified INTEGER NOT NULL DEFAULT 0,
+    claimed_at TEXT,
+    ip_address TEXT
   );
 `)
 
