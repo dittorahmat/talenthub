@@ -5,10 +5,10 @@ Pengguna dapat memilih atau beralih organisasi (workspace). Setiap operasi data 
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** closed
 
-- [ ] Skema database Drizzle mendefinisikan tabel `organizations` dan menambahkan kolom `organization_id` pada seluruh entitas inti (`jobs`, `applicants`, `activities`, `notes`).
-- [ ] Middleware context Hono mengekstrak dan memvalidasi `organization_id` dari header request (`x-organization-id`).
-- [ ] Seluruh endpoint CRUD jobs dan applicants menyaring data berdasarkan `organization_id` dari konteks request.
-- [ ] Antarmuka web memiliki indikator organisasi aktif dan switch workspace di navigation header.
-- [ ] Pengujian verifikasi memastikan data tenant A tidak bocor saat diakses oleh tenant B.
+- [x] Skema database Drizzle mendefinisikan tabel `organizations` dan menambahkan kolom `organization_id` pada seluruh entitas inti (`jobs`, `applicants`, `activities`, `notes`).
+- [x] Middleware context Hono mengekstrak dan memvalidasi `organization_id` dari header request (`x-organization-id`).
+- [x] Seluruh endpoint CRUD jobs dan applicants menyaring data berdasarkan `organization_id` dari konteks request.
+- [x] Antarmuka web memiliki indikator organisasi aktif dan switch workspace di navigation header.
+- [x] Pengujian verifikasi memastikan data tenant A tidak bocor saat diakses oleh tenant B.
