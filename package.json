@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "server": "bun run --hot src/server.ts",
     "seed": "bun run scripts/seed.ts",
-    "init-db": "bun run scripts/init-db.ts"
+    "init-db": "bun run scripts/init-db.ts",
+    "check": "vite build && wrangler deploy --dry-run",
+    "test": "bun test"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^5.20261103.1",
