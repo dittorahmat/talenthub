@@ -4,9 +4,11 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 // Global container for Cloudflare D1 instance or fallback
 let currentDb: any = null
 let currentSqlite: any = null
+let initializedD1Instance: D1Database | null = null
 
-export function initCloudflareD1(d1Instance: any) {
-  if (d1Instance) {
+export function initCloudflareD1(d1Instance: D1Database) {
+  if (d1Instance && d1Instance !== initializedD1Instance) {
+    initializedD1Instance = d1Instance
     currentDb = drizzleD1(d1Instance, { schema })
   }
 }

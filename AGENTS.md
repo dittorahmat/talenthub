@@ -9,7 +9,12 @@
   - **Cloudflare Queue**: `talenthub-cv-queue` (producer binding: `CV_QUEUE`, consumer: `talenthub-cv-queue`).
 - File konfigurasi wajib: `wrangler.jsonc`.
 - **Monolith Worker Deployment**: Frontend SPA disajikan langsung dari Worker melalui binding `ASSETS` (`./dist`), sehingga backend API, D1, R2, Queues, dan Frontend berjalan terpadu di domain Worker (`https://talenthub.tech1solusi.workers.dev`).
+  - Worker fetch handler wajib mendelegasikan non-API request (`!url.pathname.startsWith('/api')`) langsung ke `env.ASSETS.fetch(request)`.
+  - Icon browser `favicon.ico` wajib berformat binary ICO standar, bukan teks SVG XML dengan ekstensi `.ico`.
+  - Background queue handler (`queue(batch, env)`) dan request middleware wajib menginisialisasi D1 binding (`initCloudflareD1(env.DB)`) secara idempoten (cegah re-inisialisasi berulang jika instance DB sudah aktif).
+  - Skema dan seed remote D1 wajib direproduksi melalui script versioned `scripts/seed-d1.ts` (`bun run seed:d1` / `bun run seed:d1:remote`) dan tersimpan di `data/d1-schema-seed.sql`.
 - Untuk runtime local/test (Bun/Vite), sediakan adapter boundary transparan (`src/db/index.ts`) yang membaca binding Cloudflare saat berjalan di Worker, dan fallback ke sqlite/local filesystem hanya saat menjalankan unit test offline.
+  - Parameter fungsi adapter seperti `initCloudflareD1(d1Instance: D1Database)` WAJIB menggunakan tipe data domain/Cloudflare kanonik (`D1Database`), bukan `any`.
 
 ## 2. Double-Entry Credit Ledger Integrity
 - `reserveCredit` mengurangi saldo dompet dan mencatat ledger transaksi dengan tipe `RESERVED` (`amount < 0`).

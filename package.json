@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "server": "bun run --hot src/server.ts",
     "seed": "bun run scripts/seed.ts",
+    "seed:d1": "bun run scripts/seed-d1.ts",
+    "seed:d1:remote": "bun run scripts/seed-d1.ts --remote",
     "init-db": "bun run scripts/init-db.ts",
     "lint:copy": "node scripts/lint-copywriting.mjs",
     "check": "node scripts/lint-copywriting.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run",

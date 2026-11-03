@@ -61,6 +61,9 @@ export default {
     return app.fetch(request, env, ctx)
   },
   async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
+    if (env.DB) {
+      initCloudflareD1(env.DB)
+    }
     console.log(`[Cloudflare Queue Worker] Received batch of ${batch.messages.length} messages`)
     for (const message of batch.messages) {
       console.log(`Processing message ${message.id}:`, message.body)
