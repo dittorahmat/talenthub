@@ -5,9 +5,9 @@ Alur screening CV kandidat menggunakan LLM nyata dengan pemotongan kredit otomat
 
 **Blocked by:** 02: Credit Wallet and Header Pill
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Integrasi ekstraktor dokumen teks PDF dan client pemanggil LLM (Gemini Flash / OpenAI compatible) dengan skema response JSON terstruktur (`score`, `summary`, `matchedSkills`, `missingSkills`, `verdict`).
-- [ ] Endpoint upload CV `POST /api/applicants/:id/resume` memeriksa saldo dompet: jika cukup, potong 1 kredit dan simpan catatan ledger `CV_SCREENING`.
-- [ ] Hasil evaluasi tersimpan di tabel database dan disajikan langsung pada antarmuka Candidate Detail Modal.
-- [ ] Jika saldo kredit kosong (`balance == 0`), proses upload/evaluasi ditolak dengan status 402 / error ramah yang mengarahkan untuk Top Up.
+- [x] Integrasi ekstraktor dokumen teks PDF dan client pemanggil LLM (Gemini Flash / OpenAI compatible) dengan skema response JSON terstruktur (`score`, `summary`, `matchedSkills`, `missingSkills`, `verdict`).
+- [x] Endpoint upload CV `POST /api/applicants/:id/resume` memeriksa saldo dompet: jika cukup, potong 1 kredit dan simpan catatan ledger `CV_SCREENING`.
+- [x] Hasil evaluasi tersimpan di tabel database dan disajikan langsung pada antarmuka Candidate Detail Modal.
+- [x] Jika saldo kredit kosong (`balance == 0`), proses upload/evaluasi ditolak dengan status 402 / error ramah yang mengarahkan untuk Top Up.

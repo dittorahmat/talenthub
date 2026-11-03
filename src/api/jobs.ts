@@ -108,6 +108,7 @@ jobsRouter.get('/:id', async (c) => {
         screening_summary: ap.screeningSummary ?? null,
         screening_score: ap.screeningScore ?? null,
         screening_band: ap.screeningBand ?? null,
+        screening_verdict: ap.screeningVerdict ?? null,
         screening_matched: ap.screeningMatched ? ap.screeningMatched.split(', ').filter(Boolean) : [],
         screening_missing: ap.screeningMissing ? ap.screeningMissing.split(', ').filter(Boolean) : [],
         screening_exp_years: ap.screeningExpYears ?? null,

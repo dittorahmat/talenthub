@@ -52,6 +52,8 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const [activities, setActivities] = useState<Activity[]>([])
   const [newNote, setNewNote] = useState('')
   const [loading, setLoading] = useState(true)
+  const [uploadingResume, setUploadingResume] = useState(false)
+  const [uploadError, setUploadError] = useState<{ message: string; isCreditError?: boolean } | null>(null)
 
   const loadData = () => {
     orgFetch(`/api/applicants/${candidate.id}`)
@@ -134,6 +136,42 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
     const cleanPhone = (candidate.phone || '').replace(/[\s\-+]/g, '')
     const msg = `Halo ${candidate.name}, ini pengingat interview Anda di TalentHub. Silakan konfirmasi kehadirannya.`
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadError(null)
+    setUploadingResume(true)
+    try {
+      const formData = new FormData()
+      formData.append('resume', file)
+      const res = await orgFetch(`/api/applicants/${candidate.id}/resume`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (res.status === 402) {
+        const data = await res.json()
+        setUploadError({
+          message: data.message || 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.',
+          isCreditError: true
+        })
+        return
+      }
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Gagal mengunggah resume')
+      }
+
+      loadData()
+    } catch (err: any) {
+      setUploadError({ message: err.message || 'Gagal memproses resume' })
+    } finally {
+      setUploadingResume(false)
+      e.target.value = ''
+    }
   }
 
   const screeningStatus: string | undefined = details?.screening_status ?? details?.screeningStatus
@@ -418,6 +456,77 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                 </a>
               </div>
             </div>
+
+            {/* Resume Upload / Replace Action */}
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <label style={{
+                cursor: uploadingResume ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#334155',
+                opacity: uploadingResume ? 0.6 : 1
+              }}>
+                <span>{uploadingResume ? 'Mengunggah & Evaluasi AI...' : 'Unggah / Ganti Resume CV (1 Kredit)'}</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc,.txt"
+                  disabled={uploadingResume}
+                  onChange={handleResumeUpload}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>Biaya evaluasi AI: 1 kredit per CV</span>
+            </div>
+
+            {uploadError && (
+              <div style={{
+                marginTop: '12px',
+                padding: '10px 14px',
+                background: '#FEF2F2',
+                border: '1px solid #FCA5A5',
+                borderRadius: '8px',
+                color: '#991B1B',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div>
+                  <strong>{uploadError.isCreditError ? 'Saldo Kredit Habis' : 'Gagal Mengunggah'}:</strong> {uploadError.message}
+                </div>
+                {uploadError.isCreditError && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Navigate to billing / top-up or prompt
+                      window.location.hash = '#/billing'
+                      onClose()
+                    }}
+                    style={{
+                      background: '#DC2626',
+                      color: 'white',
+                      border: 'none',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Top Up Kredit
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Skrining Kualifikasi Section — shimmer only when screening_status === processing, stops on ready (R-19) */}

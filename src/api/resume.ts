@@ -1,21 +1,17 @@
 import { Hono } from 'hono'
 import { db } from '../db'
-import { applicants, activities } from '../db/schema'
+import { applicants, activities, jobs } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { mockScreening, KEYWORD_POOL, hashInt } from './screening'
 import { OrgEnv } from '../middleware/orgContext'
+import { getWallet, deductCredit } from '../services/walletService'
+import { evaluateResume } from '../services/aiScreeningService'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
 export const resumeRouter = new Hono<OrgEnv>()
-
-function extractKeywords(text: string): string[] {
-  const lowerText = text.toLowerCase()
-  return KEYWORD_POOL.filter(kw => lowerText.includes(kw.toLowerCase()))
-}
 
 resumeRouter.post('/:id/resume', async (c) => {
   try {
@@ -25,6 +21,15 @@ resumeRouter.post('/:id/resume', async (c) => {
 
     const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
+
+    // 1. Check wallet balance before processing
+    const wallet = await getWallet(orgId)
+    if (wallet.balance < 1) {
+      return c.json({
+        error: 'INSUFFICIENT_CREDIT',
+        message: 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.'
+      }, 402)
+    }
 
     const formData = await c.req.formData()
     const file = formData.get('resume') as File | null
@@ -40,6 +45,16 @@ resumeRouter.post('/:id/resume', async (c) => {
       return c.json({ error: 'File too large (max 5MB)' }, 400)
     }
 
+    // 2. Atomically deduct 1 credit
+    try {
+      await deductCredit(orgId, 1, 'CV_SCREENING', `AI Screening untuk pelamar: ${applicant.name}`)
+    } catch (err: any) {
+      return c.json({
+        error: 'INSUFFICIENT_CREDIT',
+        message: 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.'
+      }, 402)
+    }
+
     const filename = `${id}-${Date.now()}.${ext}`
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'resumes')
     const filePath = path.join(uploadDir, filename)
@@ -47,28 +62,19 @@ resumeRouter.post('/:id/resume', async (c) => {
     await fs.mkdir(uploadDir, { recursive: true })
     await fs.writeFile(filePath, buffer)
 
-    let extractedText = ''
-    try {
-      extractedText = buffer.toString('utf-8')
-    } catch {
-      extractedText = ''
-    }
-
-    const matchedKeywords = extractKeywords(extractedText)
-    const keywordsStr = matchedKeywords.join(', ') || null
-
     const resumeUrl = `/uploads/resumes/${filename}`
     const now = new Date().toISOString()
 
+    // Mark status as processing initially
     await db.update(applicants).set({
       resumeUrl,
       resumePath: filePath,
       resumeFilename: file.name,
-      resumeKeywords: keywordsStr,
       screeningStatus: 'processing',
       screeningSummary: null,
       screeningScore: null,
       screeningBand: null,
+      screeningVerdict: null,
       screeningMatched: null,
       screeningMissing: null,
       screeningExpYears: null,
@@ -79,60 +85,65 @@ resumeRouter.post('/:id/resume', async (c) => {
       organizationId: orgId,
       applicantId: id,
       type: 'resume_upload',
-      description: `Resume diunggah: ${file.name}`,
+      description: `Resume diunggah: ${file.name} (1 kredit terpotong)`,
       user: 'HR Admin',
       timestamp: now,
     })
 
-    const applicantId = id
-    const candidateName = applicant.name
-    const resumeKeywordsSnapshot = keywordsStr
+    // Fetch related job title
+    const jobRow = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+    const jobTitle = jobRow?.title || 'Posisi Terkait'
 
-    const delayMs = 3000 + (Math.abs(hashInt(applicantId * 7919 + file.name.length)) % 2001)
+    // Perform AI screening evaluation
+    const evaluation = await evaluateResume({
+      resumeBuffer: buffer,
+      jobTitle,
+      applicantName: applicant.name
+    })
 
-    setTimeout(async () => {
-      try {
-        const fresh = await db.select().from(applicants).where(and(eq(applicants.id, applicantId), eq(applicants.organizationId, orgId))).get()
-        if (!fresh) return
+    const matchedStr = evaluation.matchedSkills.join(', ') || null
+    const missingStr = evaluation.missingSkills.join(', ') || null
+    const keywordsStr = matchedStr
 
-        const screeningResult = mockScreening(
-          { id: applicantId, name: candidateName, resumeKeywords: resumeKeywordsSnapshot },
-          { title: 'Posisi Terkait' }
-        )
+    const completionTime = new Date().toISOString()
+    await db.update(applicants).set({
+      resumeKeywords: keywordsStr,
+      screeningStatus: 'ready',
+      screeningSummary: evaluation.summary,
+      screeningScore: evaluation.score,
+      screeningBand: evaluation.band,
+      screeningVerdict: evaluation.verdict,
+      screeningMatched: matchedStr,
+      screeningMissing: missingStr,
+      screeningExpYears: evaluation.expYears,
+      updatedAt: completionTime,
+    }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
 
-        const matchedStr = screeningResult.matched.join(', ') || null
-        const missingStr = screeningResult.missing.join(', ') || null
-
-        await db.update(applicants).set({
-          screeningStatus: 'ready',
-          screeningSummary: screeningResult.summary,
-          screeningScore: screeningResult.score,
-          screeningBand: screeningResult.band,
-          screeningMatched: matchedStr,
-          screeningMissing: missingStr,
-          screeningExpYears: screeningResult.expYears,
-          updatedAt: new Date().toISOString(),
-        }).where(and(eq(applicants.id, applicantId), eq(applicants.organizationId, orgId)))
-
-        await db.insert(activities).values({
-          organizationId: orgId,
-          applicantId,
-          type: 'screening_complete',
-          description: `Screening AI selesai: Skor ${screeningResult.score}/100 (${screeningResult.band})`,
-          user: 'AI Screening System',
-          timestamp: new Date().toISOString(),
-        })
-      } catch (e) {
-        console.error('Async screening failed:', e)
-      }
-    }, delayMs)
+    await db.insert(activities).values({
+      organizationId: orgId,
+      applicantId: id,
+      type: 'screening_complete',
+      description: `Screening AI selesai (${evaluation.provider}): Skor ${evaluation.score}/100 (${evaluation.band} - ${evaluation.verdict})`,
+      user: 'AI Screening System',
+      timestamp: completionTime,
+    })
 
     return c.json({
       success: true,
       resume_url: resumeUrl,
       resume_filename: file.name,
       resume_keywords: keywordsStr,
-      screening_status: 'processing',
+      screening_status: 'ready',
+      screening: {
+        score: evaluation.score,
+        summary: evaluation.summary,
+        band: evaluation.band,
+        verdict: evaluation.verdict,
+        matchedSkills: evaluation.matchedSkills,
+        missingSkills: evaluation.missingSkills,
+        expYears: evaluation.expYears,
+        provider: evaluation.provider
+      }
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
