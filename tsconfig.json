@@ -16,7 +16,6 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": false,
-    "useUnknownInCatchVariables": false,
     "paths": {
       "*": ["./*"],
       "@/*": ["./src/*"]
