@@ -1,3 +1,45 @@
+:root {
+  /* Achromatic ledger tokens (app workspace) */
+  --ground: #f8f9fa;
+  --surface: #ffffff;
+  --raised: #f1f3f5;
+  --border: #e2e8f0;
+  --border-subtle: #edf2f7;
+  --rule: #e9ecef;
+  --control: #cbd5e1;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #0f172a;
+  
+  /* Status signals (pure semantic, no gradients) */
+  --positive: #166534;
+  --negative: #991b1b;
+  --warning: #9a3412;
+  --pill-positive-bg: #dcfce7;
+  --pill-positive-ink: #14532d;
+  --pill-negative-bg: #fee2e2;
+  --pill-negative-ink: #7f1d1d;
+  --pill-warning-bg: #fef3c7;
+  --pill-warning-ink: #78350f;
+  --pill-neutral-bg: #f1f5f9;
+  --pill-neutral-ink: #334155;
+  
+  /* Accent data element */
+  --chart-primary: #1d5fbf;
+  --chart-ink: #0f172a;
+  --chart-muted: #94a3b8;
+  
+  /* Radii */
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-pill: 9999px;
+  
+  /* Typography scales */
+  --font-sans: "Geist", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-mono: "Geist Mono", "SF Mono", monospace;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,20 +47,30 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #F8F9FC;
-  color: #1F2937;
+  font-family: var(--font-sans);
+  background: var(--ground);
+  color: var(--text);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
+  border-radius: var(--radius-control);
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 input, textarea, select {
   font-family: inherit;
   font-size: inherit;
+  color: inherit;
+  border-radius: var(--radius-control);
 }
 
 a {
@@ -26,10 +78,23 @@ a {
   text-decoration: none;
 }
 
+.tabular-numbers {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.editorial-headline {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+/* Animations */
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -48,18 +113,19 @@ a {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #cbd5e1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #94a3b8;
 }
