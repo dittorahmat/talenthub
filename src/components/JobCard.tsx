@@ -21,11 +21,11 @@ function timeAgo(dateStr: string): string {
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays <= 0) return 'Hari ini'
-  if (diffDays === 1) return '1 hari lalu'
-  if (diffDays < 7) return `${diffDays} hari lalu`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} minggu lalu`
-  return `${Math.floor(diffDays / 30)} bulan lalu`
+  if (diffDays <= 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return `${Math.floor(diffDays / 30)}mo ago`
 }
 
 export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpenInbox }) => {
@@ -35,39 +35,36 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
     <div
       onClick={() => onSelect(job.id)}
       style={{
-        background: 'white',
-        padding: '24px',
-        borderRadius: '12px',
-        border: '1px solid #E2E8F0',
+        background: 'var(--surface)',
+        padding: '20px',
+        borderRadius: 'var(--radius-card)',
+        border: '1px solid var(--border)',
         cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        transition: 'border-color 0.15s ease',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         gap: '16px'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = '#0D9488'
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.12)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.borderColor = 'var(--text)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = '#E2E8F0'
-        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
-        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div style={{
-            width: 44,
-            height: 44,
-            borderRadius: '10px',
-            background: '#0D9488',
-            color: 'white',
+            width: 36,
+            height: 36,
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--raised)',
+            border: '1px solid var(--border)',
+            color: 'var(--text)',
+            fontFamily: 'var(--font-mono)',
             fontWeight: 700,
-            fontSize: '15px',
+            fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -76,93 +73,75 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
             {initials}
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 600, color: '#1E293B' }}>{job.title}</h3>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748B' }}>
-              {job.location}
-              {job.remote === 'Yes' && ' · Remote'}
-              {job.remote === 'Hybrid' && ' · Hybrid'}
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+              {job.title}
+            </h3>
+            <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--muted)' }}>
+              {job.location} · {job.remote === 'Yes' ? 'Remote' : 'On-site'}
             </p>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #F1F5F9', paddingTop: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            background: '#F0FDFA',
-            color: '#0F766E',
-            padding: '4px 10px',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: 600,
-            border: '1px solid #CCFBF1'
-          }}>
-            {job.applicantCount} pelamar
-          </span>
-          <span style={{ fontSize: '12px', color: '#94A3B8' }}>{timeAgo(job.posted_at)}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            aria-label={`Upload CV untuk ${job.title}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenInbox?.(job)
-            }}
-            style={{
-              background: 'white',
-              color: '#0D9488',
-              border: '1px solid #99F6E4',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Upload CV
-          </button>
-          <button
-            type="button"
-            aria-label={`Hapus ${job.title}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(job)
-            }}
-            style={{
-              background: 'white',
-              color: '#DC2626',
-              border: '1px solid #FECACA',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            Hapus
-          </button>
-          <button
-            type="button"
-            aria-label={`Lihat pipeline ${job.title}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelect(job.id)
-            }}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete(job)
+          }}
           style={{
-            background: '#0D9488',
-            color: 'white',
+            background: 'none',
             border: 'none',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 500,
+            color: 'var(--muted)',
+            fontSize: '14px',
+            padding: '4px',
             cursor: 'pointer'
           }}
+          title="Delete requisition"
         >
-          Lihat Pipeline
+          ✕
         </button>
+      </div>
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: '12px',
+        borderTop: '1px solid var(--border-subtle)',
+        fontSize: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="tabular-numbers" style={{ fontWeight: 700, color: 'var(--text)' }}>
+            {job.applicantCount}
+          </span>
+          <span style={{ color: 'var(--muted)' }}>applicants</span>
+          <span style={{ color: 'var(--border)' }}>·</span>
+          <span style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+            {timeAgo(job.posted_at)}
+          </span>
         </div>
+
+        {onOpenInbox && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenInbox(job)
+            }}
+            style={{
+              background: 'var(--raised)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-control)',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text)',
+              cursor: 'pointer'
+            }}
+          >
+            AI Screening Inbox →
+          </button>
+        )}
       </div>
     </div>
   )

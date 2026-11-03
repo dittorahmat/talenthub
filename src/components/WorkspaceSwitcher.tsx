@@ -27,31 +27,31 @@ export const WorkspaceSwitcher: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: 'white',
-          border: '1px solid #E2E8F0',
-          borderRadius: '8px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-control)',
           padding: '6px 12px',
           fontSize: '13px',
-          fontWeight: 600,
-          color: '#1E293B',
+          fontWeight: 500,
+          color: 'var(--text)',
           cursor: 'pointer',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          transition: 'all 0.15s ease',
         }}
-        title="Beralih Workspace Organisasi"
+        title="Switch Organization Workspace"
       >
         <span
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '20px',
-            height: '20px',
+            width: '18px',
+            height: '18px',
             borderRadius: '4px',
-            background: '#E0F2FE',
-            color: '#0369A1',
-            fontSize: '11px',
+            background: 'var(--raised)',
+            color: 'var(--text)',
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono)',
             fontWeight: 700,
+            border: '1px solid var(--border)',
           }}
         >
           {currentOrg.name.charAt(0).toUpperCase()}
@@ -59,7 +59,7 @@ export const WorkspaceSwitcher: React.FC = () => {
         <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentOrg.name}
         </span>
-        <span style={{ fontSize: '10px', color: '#64748B' }}>▼</span>
+        <span style={{ fontSize: '9px', color: 'var(--muted)' }}>▼</span>
       </button>
 
       {isOpen && (
@@ -69,22 +69,23 @@ export const WorkspaceSwitcher: React.FC = () => {
             top: 'calc(100% + 4px)',
             right: 0,
             width: '260px',
-            background: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            border: '1px solid #E2E8F0',
+            background: 'var(--surface)',
+            borderRadius: 'var(--radius-card)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+            border: '1px solid var(--border)',
             zIndex: 100,
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '8px 12px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Pilih Organisasi (Workspace)
+          <div style={{ padding: '8px 12px', background: 'var(--raised)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--muted)' }}>
+              Workspaces ({organizations.length})
             </span>
           </div>
-          <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '4px 0' }}>
+
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {organizations.map((org) => {
-              const isActive = org.id === currentOrg.id
+              const isSelected = org.id === currentOrg.id
               return (
                 <button
                   key={org.id}
@@ -100,42 +101,25 @@ export const WorkspaceSwitcher: React.FC = () => {
                     justifyContent: 'space-between',
                     padding: '8px 12px',
                     border: 'none',
-                    background: isActive ? '#F0FDF4' : 'transparent',
-                    color: isActive ? '#166534' : '#1E293B',
-                    fontSize: '13px',
-                    fontWeight: isActive ? 600 : 400,
-                    textAlign: 'left',
+                    background: isSelected ? 'var(--raised)' : 'transparent',
                     cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '13px',
+                    color: 'var(--text)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '4px',
-                        background: isActive ? '#DCFCE7' : '#F1F5F9',
-                        color: isActive ? '#15803D' : '#475569',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {org.name.charAt(0).toUpperCase()}
-                    </span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {org.name}
-                    </span>
-                  </div>
-                  {isActive && <span style={{ color: '#16A34A', fontSize: '13px', marginLeft: '6px' }}>✓</span>}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {org.name}
+                  </span>
+                  {isSelected && (
+                    <span style={{ color: 'var(--positive)', fontSize: '12px' }}>✓</span>
+                  )}
                 </button>
               )
             })}
           </div>
-          <div style={{ borderTop: '1px solid #E2E8F0', padding: '6px' }}>
+
+          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <button
               type="button"
               onClick={() => {
@@ -144,22 +128,17 @@ export const WorkspaceSwitcher: React.FC = () => {
               }}
               style={{
                 width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 10px',
-                border: '1px dashed #0284C7',
-                borderRadius: '6px',
-                background: '#F0F9FF',
-                color: '#0369A1',
+                padding: '6px',
+                background: 'var(--raised)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-control)',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: 500,
+                color: 'var(--text)',
                 cursor: 'pointer',
-                textAlign: 'left',
               }}
             >
-              <span>✨</span>
-              <span>Daftar Perusahaan Baru (Free Trial 20 Kredit)</span>
+              + Create New Workspace
             </button>
           </div>
         </div>
@@ -168,9 +147,7 @@ export const WorkspaceSwitcher: React.FC = () => {
       <TrialOnboardingModal
         isOpen={showOnboardingModal}
         onClose={() => setShowOnboardingModal(false)}
-        onSuccess={(newOrgId) => {
-          setOrganizationId(newOrgId)
-        }}
+        onSuccess={() => setShowOnboardingModal(false)}
       />
     </div>
   )
