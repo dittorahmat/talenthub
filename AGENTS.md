@@ -22,9 +22,9 @@
 - `refundCredit` menambah saldo dompet kembali (`amount > 0`) dan mencatat ledger bertipe `REFUND` atau `REFUND_CORRUPTED_FILE`.
 
 ## 3. Strict Domain Modeling & Anti-Abuse
-- Union types / canonical domain types harus digunakan (hindari `Primitive Obsession` seperti `type: string` bebas pada `CreditTransactionType` atau penggunaan `as any`). Seluruh tipe transaksi harus dideklarasikan secara eksplisit dalam union type `CreditTransactionType`.
+- Union types / canonical domain types harus digunakan (hindari `Primitive Obsession` seperti `type: string` bebas pada `CreditTransactionType` atau penggunaan `as any`). Seluruh tipe transaksi harus dideklarasikan secara eksplisit dalam union type `CreditTransactionType` baik di backend maupun di frontend.
 - **Better Auth & D1 Asynchronous Compatibility**:
-  - Drizzle query yang berjalan di backend monolith Cloudflare Worker WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). DILARANG memanggil synchronous `.get()`, `.all()`, atau `.run()` secara langsung di route handlers karena tidak kompatibel dengan Cloudflare D1 runtime asli.
+  - Drizzle query yang berjalan di backend monolith Cloudflare Worker maupun test suite WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). DILARANG memanggil synchronous `.get()`, `.all()`, atau `.run()` secara langsung di route handlers maupun test fixtures karena tidak kompatibel dengan Cloudflare D1 runtime asli.
   - Autentikasi harus mengandalkan cryptographic hashing standar (seperti `bun:password` atau native PBKDF2/Argon2/bcrypt) dan dilarang keras menyimpan/membandingkan password plain text atau pseudo-string prefix.
   - Route terproteksi (seperti `/superadmin` dan API `/api/superadmin/*`) WAJIB memiliki session & role guard yang valid, menolak akses tanpa session token resmi dari Better Auth yang terverifikasi role-nya.
 - Pendaftaran free trial wajib memverifikasi keunikan domain email korporat bahkan sebelum OTP diverifikasi, serta menerapkan IP rate-limiting untuk mencegah spamming OTP pada domain yang sama.
@@ -33,18 +33,31 @@
 
 ## 4. Automated Verification & Guardrails
 - Sebelum menyelesaikan pekerjaan atau membuat PR/commit, agen WAJIB menjalankan:
-  1. `bun run test` (memastikan seluruh 7 suite tes integrasi lulus 100%).
-  2. `bun run check` (`bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, build client, dan bundle Cloudflare Worker).
+  1. `bun run test` (memastikan seluruh 8 suite tes integrasi lulus 100%).
+  2. `bun run check` (`node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, copywriting AI-slop, synchronous Drizzle call, build client, dan bundle Cloudflare Worker).
 - Dokumentasi akun default pengujian dan alur Better Auth tersimpan di [docs/auth-setup.md](docs/auth-setup.md).
-- Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`) dan hindari asumsi perintah POSIX seperti `ls`.
+- Peta rute halaman utama tersimpan di:
+  - `/` (Landing Page) &rarr; `src/pages/LandingPage.tsx`
+  - `#/login` &rarr; `src/pages/LoginPage.tsx`
+  - `#/register` &rarr; `src/pages/RegisterPage.tsx`
+  - `#/workspace` / `#/dashboard` &rarr; `src/pages/JobsDashboard.tsx`
+  - `#/jobs?id=X` &rarr; `src/pages/KanbanBoard.tsx`
+  - `#/superadmin` &rarr; `src/pages/SuperadminPortal.tsx` (Internal Operator Console)
+- Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`) dan hindari asumsi perintah POSIX seperti `ls`. Saat memeriksa diff git, batasi path pencarian (misal `rtk git diff HEAD -- src/ tests/`) agar hemat token.
 
 ## 5. Frontend & UI/UX Design Standards (design-taste-frontend Skill)
 - Setiap perubahan, penambahan, dan perombakan antarmuka frontend (Landing Page, Auth, Dashboard, Kanban, Screening Inbox, Modal Detail, Summary Export, Billing, Topup, dan Superadmin) **WAJIB** menerapkan prinsip dan arahan dari skill `design-taste-frontend` (`.agents/skills/design-taste-frontend`).
+- **Internal / Operator Tools Zero-Exemption Rule**:
+  - Dilarang memperlakukan halaman internal/developer/superadmin sebagai kanvas prototyping instan bebas aturan.
+  - Halaman internal/operator wajib dibangun sebagai **Enterprise Operator Console** berstandar tinggi (mengikuti `references/app-screens.md`), dilarang menggunakan inline-style soup (`style={{ ... }}`), dilarang menggunakan emoji dekoratif pada header/tombol, dan dilarang menggunakan kartu metrik dengan angka berwarna-warni tanpa fungsi.
+  - **Theme & Palette Consistency**: Seluruh halaman admin/operator WAJIB menggunakan palet tema terpadu aplikasi (Light Slate Palette: background `#F8FAFC`, panel/card `bg-white`, border `border-slate-200`, aksen teal/slate), DILARANG membuat dark terminal terisolasi kecuali jika aplikasi secara eksplisit mendukung dark mode sistematis di seluruh halaman.
+  - **Strict Domain Modeling in Views**: Seluruh struktur data tampilan (seperti list item, antrean, dan tabel transaksi) wajib memiliki interface tipe data domain kanonik yang tegas; dilarang menggunakan `any`, `any[]`, atau type assertion sembarangan (`as Type`).
+  - **Scope Discipline in Refactoring**: Saat merapikan/menyeragamkan styling tampilan (UI restyle task), dilarang merombak kontrak API backend atau menambah fitur mutasi data tak diminta tanpa kesepakatan eksplisit.
 - **Anti-Generic AI Slop**: Dilarang menggunakan generic AI templates (seperti teks headline 3 baris rata tengah seragam tanpa hierarki, badge hiasan tanpa fungsi, card berulang dengan background gradient pelangi murahan, border tebal tak beraturan, atau floating glowing blur berlebihan).
 - **Substansi & Hierarki Desain**:
   - Halaman publik / marketing (`--sector saas`): Menggunakan tipografi editorial tegas, layout asimetris yang disengaja, konten nyata/substantif, dan preview produk asli.
   - Aplikasi / workspace screens (`--app`): Mengikuti pedoman `references/app-screens.md` (border tenang, label kompak, kontras data tinggi, densitas informasi teratur, status badge fungsional, dan feedback visual real-time tanpa animasi dekoratif lambat).
-- **Validasi Visual & Build**: Setiap perubahan UI wajib bebas dari TypeScript type error dan lolos build Vite (`bun run check`).
+- **Validasi Visual & Build**: Setiap perubahan UI wajib bebas dari TypeScript type error, lolos verifikasi linter standar (`scripts/lint-code-standards.mjs`), dan lolos build Vite (`bun run check`).
 - **Integrity of Callbacks & Workspace Flows**:
   - Saat merapikan/merestrukturisasi modal dan kontrol workspace (seperti `TrialOnboardingModal` dan `WorkspaceSwitcher`), dilarang memutus callback signature seperti `onSuccess(newOrgId)`. ID organisasi yang baru dibuat WAJIB dioper dan otomatis diaktifkan via `setOrganizationId(newOrgId)`.
 - **Domain State Preservation**:

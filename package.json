@@ -13,7 +13,8 @@
     "seed:d1:remote": "bun run scripts/seed-d1.ts --remote",
     "init-db": "bun run scripts/init-db.ts",
     "lint:copy": "node scripts/lint-copywriting.mjs",
-    "check": "node scripts/lint-copywriting.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
+    "lint:standards": "node scripts/lint-code-standards.mjs",
+    "check": "node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
     "test": "bun test"
   },
   "dependencies": {
@@ -31,11 +32,13 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.1.1",
     "bun-types": "^1.4.2",
     "concurrently": "^10.0.5",
+    "tailwindcss": "^4.3.4",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
   }
