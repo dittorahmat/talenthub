@@ -1,45 +1,56 @@
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { Database } from 'bun:sqlite'
 import * as schema from './schema'
-import { mkdirSync } from 'node:fs'
 
-mkdirSync('data', { recursive: true })
-const sqlite = new Database('data/talenthub.db')
-// Enable foreign keys
-sqlite.exec('PRAGMA foreign_keys = ON;')
+// Global container for Cloudflare D1 instance or fallback
+let currentDb: any = null
+let currentSqlite: any = null
 
-// Ensure trial_claims table exists
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS trial_claims (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
-    corporate_domain TEXT NOT NULL,
-    admin_email TEXT NOT NULL,
-    phone_whatsapp TEXT NOT NULL,
-    otp_code TEXT,
-    otp_expires_at TEXT,
-    is_verified INTEGER NOT NULL DEFAULT 0,
-    claimed_at TEXT,
-    ip_address TEXT
-  );
+export function initCloudflareD1(d1Instance: any) {
+  // Dynamically load drizzle-orm/d1
+  const { drizzle } = require('drizzle-orm/d1')
+  currentDb = drizzle(d1Instance, { schema })
+}
 
-  CREATE TABLE IF NOT EXISTS payment_invoices (
-    id TEXT PRIMARY KEY,
-    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    package_id TEXT NOT NULL,
-    package_name TEXT NOT NULL,
-    credits INTEGER NOT NULL,
-    amount_idr INTEGER NOT NULL,
-    payment_method TEXT NOT NULL,
-    payment_code TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'PENDING',
-    provider TEXT DEFAULT 'mock_midtrans',
-    paid_at TEXT,
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-`)
+// Transparent getter/proxy
+export const db: any = new Proxy({}, {
+  get(_target, prop) {
+    if (!currentDb) {
+      try {
+        // Use string concatenation so esbuild does not statically analyze "bun:sqlite" during worker bundling
+        const bunSqlitePkg = 'bun' + ':sqlite'
+        const drizzleBunPkg = 'drizzle-orm/' + 'bun-sqlite'
+        const { drizzle: drizzleBun } = require(drizzleBunPkg)
+        const { Database } = require(bunSqlitePkg)
+        if (!currentSqlite) {
+          const { mkdirSync } = require('node:fs')
+          mkdirSync('data', { recursive: true })
+          currentSqlite = new Database('data/talenthub.db')
+          currentSqlite.exec('PRAGMA foreign_keys = ON;')
+        }
+        currentDb = drizzleBun(currentSqlite, { schema })
+      } catch (e) {
+        throw new Error('Database not initialized with Cloudflare D1 or Bun SQLite: ' + (e as any)?.message)
+      }
+    }
+    return currentDb[prop]
+  }
+})
 
-export const db = drizzle(sqlite, { schema })
-export { sqlite }
+export const sqlite: any = new Proxy({}, {
+  get(_target, prop) {
+    if (!currentSqlite) {
+      try {
+        const bunSqlitePkg = 'bun' + ':sqlite'
+        const { Database } = require(bunSqlitePkg)
+        const { mkdirSync } = require('node:fs')
+        mkdirSync('data', { recursive: true })
+        currentSqlite = new Database('data/talenthub.db')
+        currentSqlite.exec('PRAGMA foreign_keys = ON;')
+      } catch (e) {
+        // Return dummy/noop handler in worker environment
+        return () => {}
+      }
+    }
+    const val = currentSqlite[prop]
+    return typeof val === 'function' ? val.bind(currentSqlite) : val
+  }
+})
