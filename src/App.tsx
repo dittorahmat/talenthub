@@ -6,15 +6,31 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { SuperadminPortal } from './pages/SuperadminPortal'
 
+export type AppRoute = '#/' | '#/login' | '#/register' | '#/superadmin' | '#/workspace' | '#/dashboard' | '#/jobs'
+
+export interface AuthUser {
+  id: string
+  name: string
+  email: string
+  role: 'superadmin' | 'admin' | 'recruiter'
+  organizationId: number | null
+  organization?: {
+    id: number
+    name: string
+    slug: string
+  } | null
+}
+
 export default function App() {
-  const [route, setRoute] = useState<string>(() => window.location.hash || '#/')
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [route, setRoute] = useState<AppRoute>(() => (window.location.hash as AppRoute) || '#/')
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [authChecked, setAuthChecked] = useState<boolean>(false)
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
   // Listen to hash route changes
   useEffect(() => {
     const handleHashChange = () => {
-      setRoute(window.location.hash || '#/')
+      setRoute((window.location.hash as AppRoute) || '#/')
     }
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
@@ -33,9 +49,12 @@ export default function App() {
         }
       })
       .catch(() => {})
+      .finally(() => {
+        setAuthChecked(true)
+      })
   }, [])
 
-  const handleLoginSuccess = (user: any) => {
+  const handleLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user)
     if (user.role === 'superadmin') {
       window.location.hash = '#/superadmin'
@@ -52,7 +71,7 @@ export default function App() {
     window.location.hash = '#/'
   }
 
-  // Router Dispatcher
+  // Route Dispatcher
   if (route === '#/login') {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />
   }
@@ -67,7 +86,72 @@ export default function App() {
     )
   }
 
+  // Superadmin Guard: verify role
   if (route === '#/superadmin') {
+    if (!authChecked) {
+      return <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>Memeriksa otentikasi...</div>
+    }
+
+    if (!currentUser || currentUser.role !== 'superadmin') {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: '#0F172A',
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          fontFamily: 'system-ui, sans-serif'
+        }}>
+          <div style={{
+            background: '#1E293B',
+            padding: '32px',
+            borderRadius: '16px',
+            border: '1px solid #334155',
+            maxWidth: '440px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px' }}>Akses Dibatasi</h2>
+            <p style={{ fontSize: '14px', color: '#94A3B8', margin: '0 0 24px', lineHeight: 1.5 }}>
+              Halaman ini hanya dapat diakses oleh akun dengan peran <strong>superadmin</strong>. Silakan masuk terlebih dahulu dengan kredensial superadmin.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => { window.location.hash = '#/login' }}
+                style={{
+                  background: '#0D9488',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Masuk via Login
+              </button>
+              <button
+                onClick={() => { window.location.hash = '#/' }}
+                style={{
+                  background: '#334155',
+                  color: '#CBD5E1',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                Ke Beranda
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <SuperadminPortal
         onBackToApp={() => {

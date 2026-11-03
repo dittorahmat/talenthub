@@ -17,7 +17,11 @@
 - `refundCredit` menambah saldo dompet kembali (`amount > 0`) dan mencatat ledger bertipe `REFUND` atau `REFUND_CORRUPTED_FILE`.
 
 ## 3. Strict Domain Modeling & Anti-Abuse
-- Union types / canonical domain types harus digunakan (hindari `Primitive Obsession` seperti `type: string` bebas pada `CreditTransactionType`).
+- Union types / canonical domain types harus digunakan (hindari `Primitive Obsession` seperti `type: string` bebas pada `CreditTransactionType` atau penggunaan `as any`). Seluruh tipe transaksi harus dideklarasikan secara eksplisit dalam union type `CreditTransactionType`.
+- **Better Auth & D1 Asynchronous Compatibility**:
+  - Drizzle query yang berjalan di backend monolith Cloudflare Worker WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). DILARANG memanggil synchronous `.get()`, `.all()`, atau `.run()` secara langsung di route handlers karena tidak kompatibel dengan Cloudflare D1 runtime asli.
+  - Autentikasi harus mengandalkan cryptographic hashing standar (seperti `bun:password` atau native PBKDF2/Argon2/bcrypt) dan dilarang keras menyimpan/membandingkan password plain text atau pseudo-string prefix.
+  - Route terproteksi (seperti `/superadmin` dan API `/api/superadmin/*`) WAJIB memiliki session & role guard yang valid, menolak akses tanpa session token resmi dari Better Auth yang terverifikasi role-nya.
 - Pendaftaran free trial wajib memverifikasi keunikan domain email korporat bahkan sebelum OTP diverifikasi, serta menerapkan IP rate-limiting untuk mencegah spamming OTP pada domain yang sama.
 - Fitur batch processing wajib menyediakan endpoint dan UI aksi pembatalan antrean (`cancel`) yang otomatis me-refund sisa kredit yang belum diproses.
 - Ringkasan kandidat wajib menyediakan secure tokenized public share link di samping opsi PDF dan WhatsApp.

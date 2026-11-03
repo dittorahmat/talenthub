@@ -19,6 +19,7 @@ export type CreditTransactionType =
   | 'REFUND'
   | 'REFUND_CORRUPTED_FILE'
   | 'REFUND_PROCESSING_ERROR'
+  | 'SUPERADMIN_ADJUSTMENT'
 
 export interface TransactionData {
   id: number

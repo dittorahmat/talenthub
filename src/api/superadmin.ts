@@ -3,31 +3,39 @@ import { db } from '../db'
 import { organizations, creditWallets, user, inboxItems } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { addCredit } from '../services/walletService'
+import { getSessionFromRequest } from './auth'
 
 export const superadminRouter = new Hono()
 
-// Middleware to ensure superadmin role or dev testing key
+/**
+ * Strict role guard: only users with role 'superadmin' can access superadmin APIs.
+ */
 superadminRouter.use('*', async (c, next) => {
-  // In dev / internal testing, allow checking via role header or superadmin session
-  const adminKey = c.req.header('X-Superadmin-Key')
-  const userRole = c.req.header('X-User-Role')
-  
-  // Also check session token if available
-  // In dev stage, allow if header is set or if dev local
+  // Allow explicit bypass key only during local non-production automated testing if provided
+  const devTestingKey = c.req.header('X-Superadmin-Key')
+  if (process.env.NODE_ENV !== 'production' && devTestingKey === 'dev-bypass') {
+    return next()
+  }
+
+  const auth = await getSessionFromRequest(c)
+  if (!auth || auth.user.role !== 'superadmin') {
+    return c.json({ error: 'Forbidden: Superadmin access required' }, 403)
+  }
+
   await next()
 })
 
-// 1. Get summary overview of all tenants, wallets, and batch queues
+// 1. GET /api/superadmin/overview
 superadminRouter.get('/overview', async (c) => {
   try {
-    const orgs = db.select().from(organizations).all()
-    const wallets = db.select().from(creditWallets).all()
-    const users = db.select().from(user).all()
-    const recentQueues = db.select().from(inboxItems).orderBy(desc(inboxItems.createdAt)).limit(10).all()
+    const orgs = await db.select().from(organizations)
+    const wallets = await db.select().from(creditWallets)
+    const users = await db.select().from(user)
+    const recentQueues = await db.select().from(inboxItems).orderBy(desc(inboxItems.createdAt)).limit(10)
 
-    const enrichedOrgs = orgs.map(org => {
-      const wallet = wallets.find(w => w.organizationId === org.id)
-      const orgUsers = users.filter(u => u.organizationId === org.id)
+    const enrichedOrgs = orgs.map((org: any) => {
+      const wallet = wallets.find((w: any) => w.organizationId === org.id)
+      const orgUsers = users.filter((u: any) => u.organizationId === org.id)
       return {
         ...org,
         balance: wallet ? wallet.balance : 0,
@@ -46,7 +54,7 @@ superadminRouter.get('/overview', async (c) => {
   }
 })
 
-// 2. Instant manual credit adjustment (bypasses payment gateway for dev/testing)
+// 2. POST /api/superadmin/inject-credit
 superadminRouter.post('/inject-credit', async (c) => {
   try {
     const body = await c.req.json()
@@ -56,15 +64,17 @@ superadminRouter.post('/inject-credit', async (c) => {
       return c.json({ error: 'organizationId dan amount (number) wajib diisi' }, 400)
     }
 
-    const org = db.select().from(organizations).where(eq(organizations.id, organizationId)).get()
+    const orgList = await db.select().from(organizations).where(eq(organizations.id, organizationId))
+    const org = orgList[0]
     if (!org) {
       return c.json({ error: 'Organization tidak ditemukan' }, 404)
     }
 
+    // Strongly-typed domain ledger transaction (no 'as any')
     const updatedWallet = await addCredit(
       organizationId,
       amount,
-      'SUPERADMIN_ADJUSTMENT' as any,
+      'SUPERADMIN_ADJUSTMENT',
       note || `Manual credit adjustment by Superadmin (+${amount} credits)`
     )
 

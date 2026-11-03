@@ -57,7 +57,7 @@ db.insert(account).values({
   accountId: 'superadmin@talenthub.ai',
   providerId: 'credential',
   userId: superadminUserId,
-  password: 'hashed_Admin123!@#', // Development test hash/password
+  password: '916f918a252c6811048ff3fa3648d19a:20b42da1fd2e65cceac18bc857fe61f6b872cbf824d747dbc2964bfefbecc9e33bd94190c4ce2399beedd4790696f4f6e3d8be1c414734d09150b15c513f0e2e', // Scrypt hash of Admin123!@#
   createdAt: nowTs,
   updatedAt: nowTs,
 }).run()
@@ -79,7 +79,7 @@ db.insert(account).values({
   accountId: 'recruiter@tech1solusi.com',
   providerId: 'credential',
   userId: demoUserId,
-  password: 'hashed_Demo123!@#',
+  password: '55db2f558d7c09573caa6f91a43642b2:454c5afa6d262c72e8973784db9d903fcaf117f3260d2c5afc182a3a330cc7923da4a7d8398e9f6c488c6a41ffe70200bb5876305f534d07b6da5307efc43b38', // Scrypt hash of Demo123!@#
   createdAt: nowTs,
   updatedAt: nowTs,
 }).run()
