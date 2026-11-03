@@ -34,7 +34,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
     orgFetch('/api/jobs')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
+        return res.json() as Promise<any>
       })
       .then(data => setJobs(data))
       .catch(() => setLoadError('Gagal memuat lowongan, backend tidak merespons.'))

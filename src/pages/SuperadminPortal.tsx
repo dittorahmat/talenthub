@@ -22,7 +22,7 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
         headers: { 'X-Superadmin-Key': 'dev-bypass' }
       })
       if (!res.ok) throw new Error('Failed to load superadmin overview')
-      const json = await res.json()
+      const json: any = await res.json()
       setData(json)
       if (json.organizations?.length > 0 && selectedOrgId === null) {
         setSelectedOrgId(json.organizations[0].id)
@@ -58,7 +58,7 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
         })
       })
 
-      const result = await res.json()
+      const result: any = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to inject credit')
 
       setInjectStatus(`✅ Berhasil menambahkan +${amt} kredit ke Org ID: ${selectedOrgId}`)

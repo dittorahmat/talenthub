@@ -40,7 +40,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
         }),
       })
 
-      const data = await res.json()
+      const data = (await res.json() as any)
       if (!res.ok) {
         throw new Error(data.error || 'Gagal mendaftarkan perusahaan')
       }
@@ -72,7 +72,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
         }),
       })
 
-      const data = await res.json()
+      const data = (await res.json() as any)
       if (!res.ok) {
         throw new Error(data.error || 'Verifikasi OTP gagal')
       }

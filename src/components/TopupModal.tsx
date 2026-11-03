@@ -59,7 +59,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
       try {
         const res = await orgFetch('/api/billing/packages')
         if (res.ok) {
-          const data = await res.json()
+          const data = (await res.json() as any)
           setPackages(data.packages || [])
         }
       } catch (err) {
@@ -84,10 +84,10 @@ export const TopupModal: React.FC<TopupModalProps> = ({
       })
 
       if (res.ok) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         setInvoice(data.invoice)
       } else {
-        const errData = await res.json().catch(() => ({}))
+        const errData = (await res.json() as any).catch(() => ({}))
         alert(errData.error || 'Gagal membuat tagihan pembayaran')
       }
     } catch (err) {
@@ -106,7 +106,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
         method: 'POST',
       })
       if (res.ok) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         setSuccessInfo({
           credits: data.creditsAdded || invoice.credits,
           newBalance: data.balance,
@@ -114,7 +114,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
         onPaymentSuccess(data.balance)
         window.dispatchEvent(new CustomEvent('walletChanged'))
       } else {
-        const err = await res.json().catch(() => ({}))
+        const err = (await res.json() as any).catch(() => ({}))
         alert(err.error || 'Simulasi pembayaran gagal')
       }
     } catch (err) {

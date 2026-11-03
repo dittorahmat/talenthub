@@ -54,7 +54,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
   const loadData = () => {
     setLoading(true)
     orgFetch(`/api/jobs/${jobId}`)
-      .then(res => res.json())
+      .then(res => res.json() as Promise<any>)
       .then(data => {
         setJob(data)
         setCandidates(data.applicants || [])

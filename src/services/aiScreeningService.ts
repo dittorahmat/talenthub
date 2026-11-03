@@ -306,7 +306,7 @@ Kembalikan respons HANYA dalam format JSON valid tanpa markdown formatting (tanp
       )
 
       if (response.ok) {
-        const data = await response.json()
+        const data = (await response.json() as any)
         const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text
         if (rawContent) {
           const parsed = JSON.parse(rawContent.trim())
@@ -347,7 +347,7 @@ Kembalikan respons HANYA dalam format JSON valid tanpa markdown formatting (tanp
       })
 
       if (response.ok) {
-        const data = await response.json()
+        const data = (await response.json() as any)
         const rawContent = data.choices?.[0]?.message?.content
         if (rawContent) {
           const parsed = JSON.parse(rawContent.trim())

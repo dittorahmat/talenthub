@@ -10,7 +10,7 @@
     "server": "bun run --hot src/server.ts",
     "seed": "bun run scripts/seed.ts",
     "init-db": "bun run scripts/init-db.ts",
-    "check": "vite build && wrangler deploy --dry-run",
+    "check": "bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
     "test": "bun test"
   },
   "dependencies": {

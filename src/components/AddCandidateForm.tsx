@@ -77,11 +77,11 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         throw new Error(data.error || 'Gagal menambahkan pelamar')
       }
 
-      const created = await res.json()
+      const created = (await res.json() as any)
 
       // 2. Upload resume if selected
       if (resumeFile && created.id) {

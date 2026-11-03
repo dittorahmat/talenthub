@@ -91,7 +91,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
         }
         throw new Error(`Gagal memuat inbox (${res.status})`)
       }
-      const data = await res.json()
+      const data = (await res.json() as any)
       // defensive shape handling
       const rawItems: InboxItem[] = Array.isArray(data) ? data : data.items || data.data || []
       setItems(Array.isArray(rawItems) ? rawItems : [])
@@ -164,7 +164,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     try {
       const pfRes = await orgFetch(`/api/jobs/${jobId}/inbox/preflight?count=${arr.length}`)
       if (pfRes.ok) {
-        const pf = await pfRes.json()
+        const pf: any = await pfRes.json()
         setPendingFiles(arr)
         setPreflightData(pf)
         setShowPreflightModal(true)
@@ -189,7 +189,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       if (!res.ok) {
         let errorMsg = `Upload gagal (${res.status})`
         try {
-          const json = await res.json()
+          const json = (await res.json() as any)
           if (json.message) errorMsg = json.message
         } catch {}
         throw new Error(errorMsg)

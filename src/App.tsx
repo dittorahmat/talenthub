@@ -43,7 +43,7 @@ export default function App() {
         if (res.ok) return res.json()
         return null
       })
-      .then((data) => {
+      .then((data: any) => {
         if (data?.data?.user) {
           setCurrentUser(data.data.user)
         }

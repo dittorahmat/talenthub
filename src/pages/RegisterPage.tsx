@@ -2,7 +2,7 @@ import React from 'react'
 import { TrialOnboardingModal } from '../components/TrialOnboardingModal'
 
 interface RegisterPageProps {
-  onSuccess: () => void
+  onSuccess: (newOrgId?: number) => void
 }
 
 export function RegisterPage({ onSuccess }: RegisterPageProps) {
@@ -21,8 +21,8 @@ export function RegisterPage({ onSuccess }: RegisterPageProps) {
         onClose={() => {
           window.location.hash = '#/'
         }}
-        onClaimSuccess={() => {
-          onSuccess()
+        onSuccess={(newOrgId) => {
+          onSuccess(newOrgId)
         }}
       />
     </div>

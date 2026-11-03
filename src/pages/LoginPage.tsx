@@ -22,7 +22,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         body: JSON.stringify({ email, password })
       })
 
-      const data = await res.json()
+      const data: any = await res.json()
       if (!res.ok) {
         throw new Error(data.error || 'Gagal masuk. Periksa kembali email dan password Anda.')
       }

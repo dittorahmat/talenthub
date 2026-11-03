@@ -17,7 +17,7 @@ export const CreditPill: React.FC = () => {
       setLoading(true)
       const res = await orgFetch('/api/wallet')
       if (res.ok) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         setBalance(data.balance ?? 0)
         setTransactions(data.transactions ?? [])
       }

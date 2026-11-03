@@ -29,4 +29,6 @@
 ## 4. Automated Verification & Guardrails
 - Sebelum menyelesaikan pekerjaan atau membuat PR/commit, agen WAJIB menjalankan:
   1. `bun run test` (memastikan seluruh 7 suite tes integrasi lulus 100%).
-  2. `bun run check` (`vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi pada build client dan bundle Cloudflare Worker).
+  2. `bun run check` (`bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, build client, dan bundle Cloudflare Worker).
+- Dokumentasi akun default pengujian dan alur Better Auth tersimpan di [docs/auth-setup.md](docs/auth-setup.md).
+- Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`) dan hindari asumsi perintah POSIX seperti `ls`.

@@ -61,7 +61,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
 
   const loadData = () => {
     orgFetch(`/api/applicants/${candidate.id}`)
-      .then(res => res.json())
+      .then(res => res.json() as Promise<any>)
       .then(data => {
         setDetails(data)
         setNotes(data.notes || [])
@@ -94,7 +94,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
         return
       }
       orgFetch(`/api/applicants/${candidate.id}`)
-        .then(res => res.json())
+        .then(res => res.json() as Promise<any>)
         .then(data => {
           if (cancelled) return
           setDetails((prev: any) => ({ ...prev, ...data }))
@@ -156,7 +156,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
       })
 
       if (res.status === 402) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         setUploadError({
           message: data.message || 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.',
           isCreditError: true
@@ -165,7 +165,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
       }
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json() as any)
         throw new Error(data.error || 'Gagal mengunggah resume')
       }
 
