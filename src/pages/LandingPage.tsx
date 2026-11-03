@@ -1,4 +1,5 @@
 import React from 'react'
+import { landingCopy } from '../constants/copy'
 
 export function LandingPage() {
   return (
@@ -15,7 +16,7 @@ export function LandingPage() {
       }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>TalentHub</span>
+            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>{landingCopy.brand.name}</span>
             <span style={{
               fontSize: '11px',
               fontFamily: 'var(--font-mono)',
@@ -25,15 +26,15 @@ export function LandingPage() {
               borderRadius: '4px',
               border: '1px solid var(--border)'
             }}>
-              v2.4 · Cloudflare Native
+              {landingCopy.brand.version}
             </span>
           </div>
 
           <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Alur Kerja</a>
-            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Bukti & Fitur</a>
-            <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Paket & Harga</a>
-            <a href="#/superadmin" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Portal Superadmin</a>
+            <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.workflow}</a>
+            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.evidence}</a>
+            <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.pricing}</a>
+            <a href="#/superadmin" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.superadmin}</a>
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -50,7 +51,7 @@ export function LandingPage() {
                 background: 'var(--surface)'
               }}
             >
-              Masuk
+              {landingCopy.nav.login}
             </a>
             <a
               href="#/register"
@@ -64,7 +65,7 @@ export function LandingPage() {
                 borderRadius: 'var(--radius-control)'
               }}
             >
-              Coba Gratis
+              {landingCopy.nav.claimTrial}
             </a>
           </div>
         </div>
@@ -81,13 +82,13 @@ export function LandingPage() {
             color: 'var(--muted)',
             marginBottom: '16px'
           }}>
-            Infrastruktur Skrining Kandidat · Asia Tenggara
+            {landingCopy.brand.eyebrow}
           </div>
           <h1 className="editorial-headline" style={{ fontSize: 'clamp(2.75rem, 5.5vw, 5rem)', color: 'var(--text)', marginBottom: '24px' }}>
-            Skrining ratusan CV dalam hitungan detik. Bayar hanya untuk kandidat yang berhasil dinilai.
+            {landingCopy.hero.headline}
           </h1>
           <p style={{ fontSize: '18px', color: 'var(--muted)', maxWidth: '680px', lineHeight: 1.6, marginBottom: '32px' }}>
-            Dirancang khusus untuk tim rekrutmen bervolume tinggi. TalentHub memadukan pemrosesan antrean otomatis Cloudflare dengan pembukuan kredit ganda yang transparan dan penilaian kecocokan AI yang objektif.
+            {landingCopy.hero.subhead}
           </p>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -103,7 +104,7 @@ export function LandingPage() {
                 textDecoration: 'none'
               }}
             >
-              Coba Gratis 20 Kandidat Pertama
+              {landingCopy.hero.ctaPrimary}
             </a>
             <a
               href="#/login"
@@ -118,7 +119,7 @@ export function LandingPage() {
                 textDecoration: 'none'
               }}
             >
-              Jelajahi Demo Interaktif
+              {landingCopy.hero.ctaSecondary}
             </a>
           </div>
         </div>

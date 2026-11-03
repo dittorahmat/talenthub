@@ -10,7 +10,8 @@
     "server": "bun run --hot src/server.ts",
     "seed": "bun run scripts/seed.ts",
     "init-db": "bun run scripts/init-db.ts",
-    "check": "bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
+    "lint:copy": "node scripts/lint-copywriting.mjs",
+    "check": "node scripts/lint-copywriting.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
     "test": "bun test"
   },
   "dependencies": {
