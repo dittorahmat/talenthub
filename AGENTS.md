@@ -40,3 +40,10 @@
   - Halaman publik / marketing (`--sector saas`): Menggunakan tipografi editorial tegas, layout asimetris yang disengaja, konten nyata/substantif, dan preview produk asli.
   - Aplikasi / workspace screens (`--app`): Mengikuti pedoman `references/app-screens.md` (border tenang, label kompak, kontras data tinggi, densitas informasi teratur, status badge fungsional, dan feedback visual real-time tanpa animasi dekoratif lambat).
 - **Validasi Visual & Build**: Setiap perubahan UI wajib bebas dari TypeScript type error dan lolos build Vite (`bun run check`).
+- **Integrity of Callbacks & Workspace Flows**:
+  - Saat merapikan/merestrukturisasi modal dan kontrol workspace (seperti `TrialOnboardingModal` dan `WorkspaceSwitcher`), dilarang memutus callback signature seperti `onSuccess(newOrgId)`. ID organisasi yang baru dibuat WAJIB dioper dan otomatis diaktifkan via `setOrganizationId(newOrgId)`.
+- **Domain State Preservation**:
+  - Dilarang mempersempit union type atau representasi status domain saat merapikan UI (contoh: status kerja `job.remote` yang mendukung `"Yes"`, `"No"`, dan `"Hybrid"` dilarang disederhanakan menjadi ternary binary).
+- **Scope Discipline & Test Fixtures**:
+  - Hindari menanam credential rahasia/password sembarangan di komponen produksi; gunakan konfigurasi yang jelas atau helper testing yang aman.
+  - Setiap rencana pemecahan tiket vertikal wajib diselesaikan secara menyeluruh di seluruh target komponen sebelum menandai selesai.

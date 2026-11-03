@@ -147,7 +147,12 @@ export const WorkspaceSwitcher: React.FC = () => {
       <TrialOnboardingModal
         isOpen={showOnboardingModal}
         onClose={() => setShowOnboardingModal(false)}
-        onSuccess={() => setShowOnboardingModal(false)}
+        onSuccess={(newOrgId) => {
+          if (newOrgId) {
+            setOrganizationId(newOrgId)
+          }
+          setShowOnboardingModal(false)
+        }}
       />
     </div>
   )

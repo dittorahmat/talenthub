@@ -160,30 +160,51 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           </button>
         </form>
 
-        {/* Demo Quick Pick */}
+        {/* Demo Testing Presets */}
         <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
-            Verification Preset
+            Quick Verification Presets (Dev/QA)
           </div>
-          <button
-            type="button"
-            onClick={() => handleQuickLogin('recruiter@tech1solusi.com', 'SuperPassword123!')}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'var(--raised)',
-              border: '1px solid var(--border)',
-              textAlign: 'left',
-              fontSize: '12px',
-              color: 'var(--text)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-          >
-            <span>Tech Satu Solusi (Default Recruiter)</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('recruiter@tech1solusi.com', 'SuperPassword123!')}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--raised)',
+                border: '1px solid var(--border)',
+                textAlign: 'left',
+                fontSize: '12px',
+                color: 'var(--text)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>Tech Satu Solusi (Recruiter)</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('superadmin@talenthub.ai', 'SuperAdmin2026!')}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--raised)',
+                border: '1px solid var(--border)',
+                textAlign: 'left',
+                fontSize: '12px',
+                color: 'var(--text)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>TalentHub Superadmin</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
+            </button>
+          </div>
         </div>
 
         {/* Register & Return Link */}

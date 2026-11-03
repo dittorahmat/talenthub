@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useOrg } from '../context/OrgContext'
 
 interface TrialOnboardingModalProps {
@@ -19,13 +19,34 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
   const [phoneWhatsapp, setPhoneWhatsapp] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [mockOtpHint, setMockOtpHint] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState<number>(60)
+  const [canResend, setCanResend] = useState<boolean>(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    let timer: any = null
+    if (step === 'OTP' && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            setCanResend(true)
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [step, countdown])
+
   if (!isOpen) return null
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setError(null)
     setLoading(true)
 
@@ -49,6 +70,8 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
         setMockOtpHint(data.mockOtp)
       }
       setStep('OTP')
+      setCountdown(60)
+      setCanResend(false)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -290,9 +313,14 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
-                Enter 6-Digit OTP
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+                  Enter 6-Digit OTP
+                </label>
+                <span className="tabular-numbers" style={{ fontSize: '12px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+                  {countdown > 0 ? `Expires in ${countdown}s` : 'Expired'}
+                </span>
+              </div>
               <input
                 type="text"
                 required
@@ -332,20 +360,37 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
               {loading ? 'Verifying & Granting Credits...' : 'Verify OTP & Activate 20 Credits'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setStep('REGISTER')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--muted)',
-                fontSize: '12px',
-                cursor: 'pointer',
-                marginTop: '4px',
-              }}
-            >
-              ← Back to Registration Details
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setStep('REGISTER')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--muted)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                ← Edit Company Details
+              </button>
+
+              <button
+                type="button"
+                disabled={!canResend || loading}
+                onClick={() => handleRegister()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: canResend ? 'var(--chart-primary)' : 'var(--muted)',
+                  fontSize: '12px',
+                  cursor: canResend ? 'pointer' : 'not-allowed',
+                  textDecoration: canResend ? 'underline' : 'none'
+                }}
+              >
+                Resend OTP
+              </button>
+            </div>
           </form>
         )}
       </div>

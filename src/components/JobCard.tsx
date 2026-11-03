@@ -77,7 +77,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
               {job.title}
             </h3>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--muted)' }}>
-              {job.location} · {job.remote === 'Yes' ? 'Remote' : 'On-site'}
+              {job.location} · {job.remote === 'Yes' ? 'Remote' : job.remote === 'Hybrid' ? 'Hybrid' : 'On-site'}
             </p>
           </div>
         </div>

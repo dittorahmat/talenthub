@@ -9,12 +9,12 @@ export function RegisterPage({ onSuccess }: RegisterPageProps) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F0FDFA 0%, #E2E8F0 100%)',
+      background: 'var(--ground)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      fontFamily: 'var(--font-sans)'
     }}>
       <TrialOnboardingModal
         isOpen={true}
