@@ -85,3 +85,21 @@ export const jobKnockouts = sqliteTable('job_knockouts', {
   jobId: integer('job_id').notNull().references(() => jobs.id, { onDelete: 'cascade' }),
   question: text('question').notNull(),
 })
+
+export const creditWallets = sqliteTable('credit_wallets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().unique().references(() => organizations.id, { onDelete: 'cascade' }),
+  balance: integer('balance').notNull().default(0),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const creditTransactions = sqliteTable('credit_transactions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  walletId: integer('wallet_id').notNull().references(() => creditWallets.id, { onDelete: 'cascade' }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  amount: integer('amount').notNull(),
+  type: text('type').notNull(),
+  description: text('description'),
+  balanceAfter: integer('balance_after').notNull(),
+  createdAt: text('created_at').notNull(),
+})

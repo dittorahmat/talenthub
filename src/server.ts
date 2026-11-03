@@ -9,6 +9,7 @@ import { resumeRouter } from './api/resume'
 import { inboxRouter } from './api/inbox'
 import { assistantRouter } from './api/assistant'
 import { organizationsRouter } from './api/organizations'
+import { walletRouter } from './api/wallet'
 
 const app = new Hono()
 
@@ -18,6 +19,7 @@ app.use('/api/*', orgMiddleware)
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
 app.route('/api/organizations', organizationsRouter)
+app.route('/api/wallet', walletRouter)
 app.route('/api/jobs', jobsRouter)
 app.route('/api/applicants', applicantsRouter)
 app.route('/api/whatsapp', whatsappRouter)

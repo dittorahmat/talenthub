@@ -5,10 +5,10 @@ Sistem dompet kredit untuk setiap organisasi. Pengguna dapat melihat sisa kredit
 
 **Blocked by:** 01: Multi-tenant Isolation and Workspace
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Tabel `credit_wallets` dan `credit_transactions` didefinisikan dengan relasi ke `organizations`.
-- [ ] API endpoint `GET /api/wallet` mengembalikan saldo aktif dan mutasi transaksi terakhir.
-- [ ] Fungsi helper transaksi kredit atomik (`deductCredit`, `addCredit`, `reserveCredit`, `refundCredit`) dengan conditional guard (`balance >= amount`).
-- [ ] Komponen Header menampilkan badge kredit interaktif real-time dengan tombol Top Up.
-- [ ] Modal/halaman ringkasan riwayat ledger kredit menampilkan datetime, deskripsi transaksi, dan pergeseran saldo (+/-).
+- [x] Tabel `credit_wallets` dan `credit_transactions` didefinisikan dengan relasi ke `organizations`.
+- [x] API endpoint `GET /api/wallet` mengembalikan saldo aktif dan mutasi transaksi terakhir.
+- [x] Fungsi helper transaksi kredit atomik (`deductCredit`, `addCredit`, `reserveCredit`, `refundCredit`) dengan conditional guard (`balance >= amount`).
+- [x] Komponen Header menampilkan badge kredit interaktif real-time dengan tombol Top Up.
+- [x] Modal/halaman ringkasan riwayat ledger kredit menampilkan datetime, deskripsi transaksi, dan pergeseran saldo (+/-).

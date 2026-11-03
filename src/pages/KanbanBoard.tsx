@@ -18,6 +18,7 @@ import { CandidateDetailModal } from '../components/CandidateDetailModal'
 import { AddCandidateForm } from '../components/AddCandidateForm'
 import { SearchIcon } from '../components/Icons'
 import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher'
+import { CreditPill } from '../components/CreditPill'
 import { orgFetch, useOrg } from '../context/OrgContext'
 
 const STAGES = ['Applied', 'Phone Screen', 'Technical', 'Final Interview', 'Offer', 'Hired']
@@ -218,6 +219,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
               <option value="Potential">Potential (50-74)</option>
               <option value="Weak">Weak (&lt;50)</option>
             </select>
+            <CreditPill />
             <WorkspaceSwitcher />
             <button
               type="button"

@@ -1,5 +1,6 @@
 import React from 'react'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
+import { CreditPill } from './CreditPill'
 
 interface ModuleHubProps {
   onSelectModule: (key: string) => void
@@ -116,6 +117,7 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({ onSelectModule }) => {
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CreditPill />
             <WorkspaceSwitcher />
             <span
             style={{

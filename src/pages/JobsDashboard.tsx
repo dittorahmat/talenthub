@@ -3,6 +3,7 @@ import { JobCard, Job } from '../components/JobCard'
 import { SearchIcon } from '../components/Icons'
 import { ScreeningInbox } from '../components/ScreeningInbox'
 import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher'
+import { CreditPill } from '../components/CreditPill'
 import { orgFetch, useOrg } from '../context/OrgContext'
 
 interface JobsDashboardProps {
@@ -116,6 +117,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CreditPill />
             <WorkspaceSwitcher />
             <button
             type="button"

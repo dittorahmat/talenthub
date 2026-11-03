@@ -1,6 +1,8 @@
 import { sqlite } from '../src/db'
 
 sqlite.exec(`
+  DROP TABLE IF EXISTS credit_transactions;
+  DROP TABLE IF EXISTS credit_wallets;
   DROP TABLE IF EXISTS inbox_items;
   DROP TABLE IF EXISTS job_knockouts;
   DROP TABLE IF EXISTS activities;
@@ -92,6 +94,24 @@ sqlite.exec(`
     knockout_result TEXT,
     duplicate_of INTEGER,
     promoted_applicant_id INTEGER,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS credit_wallets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+    balance INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS credit_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet_id INTEGER NOT NULL REFERENCES credit_wallets(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    description TEXT,
+    balance_after INTEGER NOT NULL,
     created_at TEXT NOT NULL
   );
 `)

@@ -1,8 +1,10 @@
 import { db, sqlite } from '../src/db'
-import { organizations, jobs, applicants, notes, activities, inboxItems, jobKnockouts } from '../src/db/schema'
+import { organizations, jobs, applicants, notes, activities, inboxItems, jobKnockouts, creditWallets, creditTransactions } from '../src/db/schema'
 import { mockScreening } from '../src/api/screening'
 import { eq } from 'drizzle-orm'
 
+sqlite.exec('DELETE FROM credit_transactions;')
+sqlite.exec('DELETE FROM credit_wallets;')
 sqlite.exec('DELETE FROM inbox_items;')
 sqlite.exec('DELETE FROM job_knockouts;')
 sqlite.exec('DELETE FROM activities;')
@@ -28,7 +30,42 @@ const insertedOrgs = db.insert(organizations).values([
   }
 ]).returning().all()
 
-const defaultOrgId = insertedOrgs[0].id // id 1 ("tech-satu-solusi")
+const org1 = insertedOrgs[0]
+const org2 = insertedOrgs[1]
+const defaultOrgId = org1.id // id 1 ("tech-satu-solusi")
+
+// Seed Wallets & Transactions
+const wallet1 = db.insert(creditWallets).values({
+  organizationId: org1.id,
+  balance: 50,
+  updatedAt: now,
+}).returning().get()
+
+db.insert(creditTransactions).values({
+  walletId: wallet1.id,
+  organizationId: org1.id,
+  amount: 50,
+  type: 'INITIAL_GRANT',
+  description: 'Initial free tier credits for Tech Satu Solusi',
+  balanceAfter: 50,
+  createdAt: now,
+}).run()
+
+const wallet2 = db.insert(creditWallets).values({
+  organizationId: org2.id,
+  balance: 20,
+  updatedAt: now,
+}).returning().get()
+
+db.insert(creditTransactions).values({
+  walletId: wallet2.id,
+  organizationId: org2.id,
+  amount: 20,
+  type: 'INITIAL_GRANT',
+  description: 'Initial grant for PT Sirius Global Technologies',
+  balanceAfter: 20,
+  createdAt: now,
+}).run()
 
 const jobsData = [
   { organizationId: defaultOrgId, title: 'Senior Frontend Engineer', location: 'Jakarta, Indonesia', remote: 'Yes', postedAt: '2026-09-05' },
