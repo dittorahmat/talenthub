@@ -1,19 +1,33 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/bun'
+import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
 import { whatsappRouter } from './api/whatsapp'
 import { resumeRouter } from './api/resume'
 import { inboxRouter } from './api/inbox'
 import { assistantRouter } from './api/assistant'
+import { organizationsRouter } from './api/organizations'
+import { walletRouter } from './api/wallet'
+import { onboardingRouter } from './api/onboarding'
+import { billingRouter } from './api/billing'
+import { authRouter } from './api/auth'
+import { superadminRouter } from './api/superadmin'
 
 const app = new Hono()
 
 app.use('*', cors({ origin: ['http://localhost:5173'], credentials: true }))
+app.use('/api/*', orgMiddleware)
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
+app.route('/api/auth', authRouter)
+app.route('/api/superadmin', superadminRouter)
+app.route('/api/organizations', organizationsRouter)
+app.route('/api/wallet', walletRouter)
+app.route('/api/onboarding', onboardingRouter)
+app.route('/api/billing', billingRouter)
 app.route('/api/jobs', jobsRouter)
 app.route('/api/applicants', applicantsRouter)
 app.route('/api/whatsapp', whatsappRouter)

@@ -1,0 +1,4 @@
+Budi Santoso
+Senior Frontend Engineer
+Skills: React, TypeScript, JavaScript, CSS, Git
+Pengalaman: 5 tahun membangun aplikasi enterprise.

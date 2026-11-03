@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { JobCard, Job } from '../components/JobCard'
 import { SearchIcon } from '../components/Icons'
 import { ScreeningInbox } from '../components/ScreeningInbox'
+import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher'
+import { CreditPill } from '../components/CreditPill'
+import { orgFetch, useOrg } from '../context/OrgContext'
 
 interface JobsDashboardProps {
   onSelectJob: (id: number) => void
 }
 
 export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => {
+  const { currentOrg } = useOrg()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -27,10 +31,10 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
   const loadJobs = () => {
     setLoading(true)
     setLoadError(null)
-    fetch('/api/jobs')
+    orgFetch('/api/jobs')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
+        return res.json() as Promise<any>
       })
       .then(data => setJobs(data))
       .catch(() => setLoadError('Gagal memuat lowongan, backend tidak merespons.'))
@@ -39,12 +43,12 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
 
   useEffect(() => {
     loadJobs()
-  }, [])
+  }, [currentOrg.id])
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newJob.title || !newJob.location) return
-    await fetch('/api/jobs', {
+    await orgFetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newJob)
@@ -57,7 +61,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
   const handleDeleteJob = async (job: Job) => {
     if (!window.confirm(`Hapus lowongan "${job.title}" beserta ${job.applicantCount} pelamar? Tindakan ini tidak dapat dibatalkan.`)) return
     try {
-      await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
+      await orgFetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
       loadJobs()
     } catch (err) {
       console.error(err)
@@ -112,7 +116,10 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
               TalentHub oleh PT. Sirius Global Technologies
             </p>
           </div>
-          <button
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CreditPill />
+            <WorkspaceSwitcher />
+            <button
             type="button"
             aria-label="Buat lowongan baru"
             onClick={() => setShowAddModal(true)}
@@ -133,6 +140,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
           >
             <span aria-hidden="true">+</span> New Job
           </button>
+          </div>
         </div>
 
         {/* Filter / Search Bar */}

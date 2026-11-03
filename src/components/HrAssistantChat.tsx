@@ -94,7 +94,7 @@ export const HrAssistantChat: React.FC<HrAssistantChatProps> = ({ onBack }) => {
     try {
       const res = await fetch(`/api/assistant/answer?q=${encodeURIComponent(q)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = (await res.json() as any)
       // normalize shapes: { answer, action, fallback, contact, reference } or { text, ... }
       const answerText: string = data.answer ?? data.text ?? data.message ?? ''
       const hasAction: boolean = data.action === 'leave' || data.action === 'Ajukan Cuti' || data.showLeaveButton === true || (typeof answerText === 'string' && answerText.includes('8 hari') && !data.fallback)
@@ -151,7 +151,7 @@ export const HrAssistantChat: React.FC<HrAssistantChatProps> = ({ onBack }) => {
         body: JSON.stringify({ startDate, endDate }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = (await res.json() as any)
       const reference: string = data.reference ?? data.ref ?? data.id ?? `CUTI-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`
       const msg = data.message ?? `Pengajuan cuti ${startDate} s/d ${endDate} berhasil.`
       const refMsg: ChatMsg = {
@@ -184,7 +184,7 @@ export const HrAssistantChat: React.FC<HrAssistantChatProps> = ({ onBack }) => {
     try {
       const res = await fetch('/api/assistant/requests')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = (await res.json() as any)
       const list: LeaveRequest[] = Array.isArray(data) ? data : data.requests ?? data.data ?? []
       setRequests(list)
       setShowRequests(true)

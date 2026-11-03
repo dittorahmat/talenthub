@@ -1,0 +1,4 @@
+
+Rian Pratama
+Fullstack Engineer
+4 tahun pengalaman membangun sistem web menggunakan React, TypeScript, Node.js, SQL, dan Docker.

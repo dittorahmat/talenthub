@@ -17,6 +17,9 @@ import { PipelineStats } from '../components/PipelineStats'
 import { CandidateDetailModal } from '../components/CandidateDetailModal'
 import { AddCandidateForm } from '../components/AddCandidateForm'
 import { SearchIcon } from '../components/Icons'
+import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher'
+import { CreditPill } from '../components/CreditPill'
+import { orgFetch, useOrg } from '../context/OrgContext'
 
 const STAGES = ['Applied', 'Phone Screen', 'Technical', 'Final Interview', 'Offer', 'Hired']
 
@@ -26,6 +29,7 @@ interface KanbanBoardProps {
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
+  const { currentOrg } = useOrg()
   const [job, setJob] = useState<any>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,8 +53,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
 
   const loadData = () => {
     setLoading(true)
-    fetch(`/api/jobs/${jobId}`)
-      .then(res => res.json())
+    orgFetch(`/api/jobs/${jobId}`)
+      .then(res => res.json() as Promise<any>)
       .then(data => {
         setJob(data)
         setCandidates(data.applicants || [])
@@ -61,14 +65,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
 
   useEffect(() => {
     loadData()
-  }, [jobId])
+  }, [jobId, currentOrg.id])
 
   const handleStatusChange = async (id: number, newStatus: string) => {
     // Optimistic UI update
     setCandidates(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c))
 
     try {
-      await fetch(`/api/applicants/${id}/status`, {
+      await orgFetch(`/api/applicants/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -83,7 +87,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
   const handleDeleteCandidate = async (candidate: Candidate) => {
     if (!window.confirm(`Hapus ${candidate.name} dari pipeline? Tindakan ini tidak dapat dibatalkan.`)) return
     try {
-      await fetch(`/api/applicants/${candidate.id}`, { method: 'DELETE' })
+      await orgFetch(`/api/applicants/${candidate.id}`, { method: 'DELETE' })
       if (selectedCandidate?.id === candidate.id) setSelectedCandidate(null)
       loadData()
     } catch (err) {
@@ -215,6 +219,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
               <option value="Potential">Potential (50-74)</option>
               <option value="Weak">Weak (&lt;50)</option>
             </select>
+            <CreditPill />
+            <WorkspaceSwitcher />
             <button
               type="button"
               aria-label="Tambah kandidat baru"

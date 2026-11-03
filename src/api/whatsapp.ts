@@ -1,20 +1,22 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants, activities } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
+import { OrgEnv } from '../middleware/orgContext'
 
-export const whatsappRouter = new Hono()
+export const whatsappRouter = new Hono<OrgEnv>()
 
 // GET /api/whatsapp/:applicantId
 whatsappRouter.get('/:applicantId', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('applicantId'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
-    const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get()
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
     const jobTitle = job ? job.title : 'posisi yang dilamar'
 
     const phone = (applicant.phone || '').replace(/[\s\-+]/g, '')
@@ -23,6 +25,7 @@ whatsappRouter.get('/:applicantId', async (c) => {
 
     // Log activity
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
       type: 'reminder_sent',
       description: `HR Admin mengirim pengingat WhatsApp kepada ${applicant.name}`,

@@ -1,15 +1,67 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants, notes, activities } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
+import { OrgEnv } from '../middleware/orgContext'
+import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
+import crypto from 'crypto'
 
-export const applicantsRouter = new Hono()
+export const applicantsRouter = new Hono<OrgEnv>()
+
+// In-memory token store for public candidate intelligence sharing
+const shareTokenStore = new Map<string, { applicantId: number; expiresAt: number }>()
+
+applicantsRouter.post('/:id/share-token', async (c) => {
+  const orgId = c.get('orgId') || 1
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+  const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+  if (!applicant) return c.notFound()
+
+  const token = crypto.randomBytes(16).toString('hex')
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+  shareTokenStore.set(token, { applicantId: id, expiresAt })
+
+  return c.json({
+    token,
+    shareUrl: `/share/candidate/${token}`,
+    expiresAt: new Date(expiresAt).toISOString(),
+  })
+})
+
+applicantsRouter.get('/public/share/:token', async (c) => {
+  const token = c.req.param('token')
+  const entry = shareTokenStore.get(token)
+  if (!entry || entry.expiresAt < Date.now()) {
+    return c.json({ error: 'Tautan telah kadaluarsa atau tidak valid' }, 404)
+  }
+
+  const applicant = await db.select().from(applicants).where(eq(applicants.id, entry.applicantId)).get() as any
+  if (!applicant) return c.notFound()
+  const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get() as any
+
+  const matched = applicant.screeningMatched ? applicant.screeningMatched.split(', ').filter(Boolean) : []
+  const missing = applicant.screeningMissing ? applicant.screeningMissing.split(', ').filter(Boolean) : []
+
+  return c.json({
+    name: applicant.name,
+    jobTitle: job?.title ?? 'Posisi Pekerjaan',
+    score: applicant.screeningScore,
+    band: applicant.screeningBand,
+    verdict: applicant.screeningVerdict,
+    summary: applicant.screeningSummary,
+    matchedSkills: matched,
+    missingSkills: missing,
+    interviewQuestions: generateInterviewQuestions(missing),
+  })
+})
 
 applicantsRouter.get('/:id/screening', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
     const status = (applicant as any).screeningStatus ?? 'pending'
@@ -32,9 +84,69 @@ applicantsRouter.get('/:id/screening', async (c) => {
       summary: (applicant as any).screeningSummary,
       score: (applicant as any).screeningScore,
       band: (applicant as any).screeningBand,
+      verdict: (applicant as any).screeningVerdict,
       matched: (applicant as any).screeningMatched ? (applicant as any).screeningMatched.split(', ').filter(Boolean) : [],
       missing: (applicant as any).screeningMissing ? (applicant as any).screeningMissing.split(', ').filter(Boolean) : [],
       expYears: (applicant as any).screeningExpYears,
+      interviewQuestions: generateInterviewQuestions(
+        (applicant as any).screeningMissing ? (applicant as any).screeningMissing.split(', ').filter(Boolean) : []
+      ),
+    })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+applicantsRouter.get('/:id/summary', async (c) => {
+  try {
+    const orgId = c.get('orgId') || 1
+    const id = parseInt(c.req.param('id'))
+    if (isNaN(id)) return c.notFound()
+
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
+
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+    const a = applicant as any
+
+    const matchedSkills = a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : []
+    const missingSkills = a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : []
+    const roleTitle = job?.title || 'Posisi Terkait'
+    const questions = generateInterviewQuestions(missingSkills, roleTitle)
+    const formattedDate = applicant.createdAt ? new Date(applicant.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Hari ini'
+
+    const whatsappShareText = formatWhatsAppSummary({
+      candidateName: applicant.name,
+      appliedRole: roleTitle,
+      appliedDate: formattedDate,
+      score: a.screeningScore,
+      verdict: a.screeningVerdict,
+      summary: a.screeningSummary,
+      matchedSkills,
+      missingSkills,
+      expYears: a.screeningExpYears,
+      interviewQuestions: questions
+    })
+
+    return c.json({
+      candidate_id: applicant.id,
+      candidate_name: applicant.name,
+      candidate_email: applicant.email,
+      candidate_phone: applicant.phone,
+      applied_role: roleTitle,
+      applied_date: applicant.createdAt,
+      applied_date_formatted: formattedDate,
+      status: applicant.status,
+      screening_status: a.screeningStatus ?? 'pending',
+      screening_score: a.screeningScore ?? null,
+      screening_band: a.screeningBand ?? null,
+      screening_verdict: a.screeningVerdict ?? null,
+      screening_summary: a.screeningSummary ?? null,
+      matched_skills: matchedSkills,
+      missing_skills: missingSkills,
+      screening_exp_years: a.screeningExpYears ?? null,
+      interview_questions: questions,
+      whatsapp_share_text: whatsappShareText
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -43,19 +155,21 @@ applicantsRouter.get('/:id/screening', async (c) => {
 
 applicantsRouter.get('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
-    const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get()
-    const appNotes = await db.select().from(notes).where(eq(notes.applicantId, id)).orderBy(desc(notes.createdAt)).all()
-    const appActivities = await db.select().from(activities).where(eq(activities.applicantId, id)).orderBy(desc(activities.timestamp)).all()
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+    const appNotes = await db.select().from(notes).where(and(eq(notes.applicantId, id), eq(notes.organizationId, orgId))).orderBy(desc(notes.createdAt)).all()
+    const appActivities = await db.select().from(activities).where(and(eq(activities.applicantId, id), eq(activities.organizationId, orgId))).orderBy(desc(activities.timestamp)).all()
 
     const a = applicant as any
     return c.json({
       id: applicant.id,
+      organization_id: applicant.organizationId,
       job_id: applicant.jobId,
       name: applicant.name,
       email: applicant.email,
@@ -71,12 +185,48 @@ applicantsRouter.get('/:id', async (c) => {
       screening_summary: a.screeningSummary ?? null,
       screening_score: a.screeningScore ?? null,
       screening_band: a.screeningBand ?? null,
+      screening_verdict: a.screeningVerdict ?? null,
       screening_matched: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
       screening_missing: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
       screening_exp_years: a.screeningExpYears ?? null,
-      job: job ? { id: job.id, title: job.title, location: job.location, remote: job.remote } : null,
+      interview_questions: generateInterviewQuestions(
+        a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+        job?.title || 'posisi yang dilamar'
+      ),
+      job: job ? { id: job.id, organization_id: job.organizationId, title: job.title, location: job.location, remote: job.remote } : null,
       notes: appNotes.map(n => ({ id: n.id, applicantId: n.applicantId, text: n.text, author: n.author, created_at: n.createdAt })),
-      activities: appActivities.map(a => ({ id: a.id, applicantId: a.applicantId, type: a.type, description: a.description, user: a.user, timestamp: a.timestamp }))
+      activities: appActivities.map(act => ({ id: act.id, applicantId: act.applicantId, type: act.type, description: act.description, user: act.user, timestamp: act.timestamp })),
+      summary_export: {
+        candidate_name: applicant.name,
+        applied_role: job?.title || 'Unknown Role',
+        applied_date: applicant.createdAt,
+        score: a.screeningScore ?? null,
+        band: a.screeningBand ?? null,
+        verdict: a.screeningVerdict ?? null,
+        summary: a.screeningSummary ?? null,
+        matched_skills: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
+        missing_skills: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+        exp_years: a.screeningExpYears ?? null,
+        interview_questions: generateInterviewQuestions(
+          a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+          job?.title || 'posisi yang dilamar'
+        ),
+        whatsapp_share_text: formatWhatsAppSummary({
+          candidateName: applicant.name,
+          appliedRole: job?.title || 'Posisi Terkait',
+          appliedDate: applicant.createdAt ? new Date(applicant.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Hari ini',
+          score: a.screeningScore,
+          verdict: a.screeningVerdict,
+          summary: a.screeningSummary,
+          matchedSkills: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
+          missingSkills: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+          expYears: a.screeningExpYears,
+          interviewQuestions: generateInterviewQuestions(
+            a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+            job?.title || 'posisi yang dilamar'
+          )
+        })
+      }
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -85,6 +235,7 @@ applicantsRouter.get('/:id', async (c) => {
 
 applicantsRouter.post('/', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const data = await c.req.json()
     const { name, email, phone, source, status, job_id } = data
 
@@ -92,9 +243,17 @@ applicantsRouter.post('/', async (c) => {
       return c.json({ error: 'Nama dan email wajib diisi' }, 400)
     }
 
+    const targetJobId = job_id || 1
+    // Verify job belongs to this org
+    const jobExists = await db.select().from(jobs).where(and(eq(jobs.id, targetJobId), eq(jobs.organizationId, orgId))).get()
+    if (!jobExists) {
+      return c.json({ error: 'Invalid job for this organization' }, 400)
+    }
+
     const now = new Date().toISOString()
     const inserted = await db.insert(applicants).values({
-      jobId: job_id || 1,
+      organizationId: orgId,
+      jobId: targetJobId,
       name,
       email,
       phone: phone || '',
@@ -105,6 +264,7 @@ applicantsRouter.post('/', async (c) => {
     }).returning().get()
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: inserted.id,
       type: 'status_change',
       description: `HR Admin menambahkan kandidat ${inserted.name} pada status ${inserted.status}`,
@@ -114,6 +274,7 @@ applicantsRouter.post('/', async (c) => {
 
     return c.json({
       id: inserted.id,
+      organization_id: inserted.organizationId,
       job_id: inserted.jobId,
       name: inserted.name,
       email: inserted.email,
@@ -129,22 +290,24 @@ applicantsRouter.post('/', async (c) => {
 
 applicantsRouter.patch('/:id/status', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
     const { status } = await c.req.json()
     if (!status) return c.json({ error: 'Status is required' }, 400)
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
     const now = new Date().toISOString()
     await db.update(applicants).set({
       status,
       updatedAt: now
-    }).where(eq(applicants.id, id))
+    }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
       type: 'status_change',
       description: `HR Admin memindahkan ${applicant.name} dari ${applicant.status} ke ${status}`,
@@ -160,14 +323,19 @@ applicantsRouter.patch('/:id/status', async (c) => {
 
 applicantsRouter.patch('/:id/notes', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
+
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
 
     const { text, author } = await c.req.json()
     if (!text || !text.trim()) return c.json({ error: 'Note text cannot be empty' }, 400)
 
     const now = new Date().toISOString()
     const insertedNote = await db.insert(notes).values({
+      organizationId: orgId,
       applicantId: id,
       text: text.trim(),
       author: author || 'HR Admin',
@@ -175,6 +343,7 @@ applicantsRouter.patch('/:id/notes', async (c) => {
     }).returning().get()
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
       type: 'note',
       description: `${insertedNote.author} menambahkan catatan: "${insertedNote.text.slice(0, 50)}${insertedNote.text.length > 50 ? '...' : ''}"`,
@@ -196,13 +365,14 @@ applicantsRouter.patch('/:id/notes', async (c) => {
 
 applicantsRouter.delete('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
-    await db.delete(applicants).where(eq(applicants.id, id))
+    await db.delete(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
     return c.json({ success: true, id })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -211,10 +381,14 @@ applicantsRouter.delete('/:id', async (c) => {
 
 applicantsRouter.get('/:id/activities', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const appActivities = await db.select().from(activities).where(eq(activities.applicantId, id)).orderBy(desc(activities.timestamp)).all()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
+
+    const appActivities = await db.select().from(activities).where(and(eq(activities.applicantId, id), eq(activities.organizationId, orgId))).orderBy(desc(activities.timestamp)).all()
 
     return c.json(appActivities.map(a => ({
       id: a.id,
