@@ -85,7 +85,7 @@ export async function canClaimTrial(
   const cleanDomain = domain.toLowerCase().trim()
   const cleanPhone = normalizePhoneNumber(phone)
 
-  // 1. Check if domain already claimed
+  // 1. Check if domain already claimed (verified or active recent claim)
   const existingDomainClaim = await db
     .select()
     .from(trialClaims)
@@ -101,6 +101,28 @@ export async function canClaimTrial(
     return {
       eligible: false,
       reason: `Domain perusahaan ${cleanDomain} telah digunakan untuk klaim Free Trial sebelumnya.`,
+    }
+  }
+
+  // 1b. Check if there is an unverified active claim in the last 15 minutes with different phone (prevent OTP hijacking)
+  const recentUnverifiedDomain = await db
+    .select()
+    .from(trialClaims)
+    .where(
+      and(
+        eq(trialClaims.corporateDomain, cleanDomain),
+        eq(trialClaims.isVerified, 0)
+      )
+    )
+    .get()
+
+  if (recentUnverifiedDomain && recentUnverifiedDomain.phoneWhatsapp !== cleanPhone && recentUnverifiedDomain.otpExpiresAt) {
+    const expires = new Date(recentUnverifiedDomain.otpExpiresAt).getTime()
+    if (Date.now() < expires) {
+      return {
+        eligible: false,
+        reason: `Kode verifikasi sedang aktif untuk domain ${cleanDomain}. Silakan gunakan nomor WhatsApp yang didaftarkan sebelumnya atau tunggu sesaat.`,
+      }
     }
   }
 
@@ -120,6 +142,21 @@ export async function canClaimTrial(
     return {
       eligible: false,
       reason: `Nomor WhatsApp ${cleanPhone} telah digunakan untuk klaim Free Trial sebelumnya.`,
+    }
+  }
+
+  // 3. IP Rate Limiting Check (max 3 trial registrations per IP per 24 hours)
+  if (ip && ip !== '127.0.0.1' && ip !== '::1' && ip !== 'localhost') {
+    const claimsFromIp = await db
+      .select()
+      .from(trialClaims)
+      .where(eq(trialClaims.ipAddress, ip))
+      .all()
+    if (claimsFromIp && claimsFromIp.length >= 3) {
+      return {
+        eligible: false,
+        reason: 'Batas pendaftaran Free Trial dari jaringan/perangkat Anda telah tercapai. Hubungi tim sales kami.',
+      }
     }
   }
 

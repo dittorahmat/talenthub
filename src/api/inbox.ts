@@ -82,6 +82,20 @@ inboxRouter.get('/jobs/:id/inbox/status', async (c) => {
   return c.json(status)
 })
 
+inboxRouter.post('/jobs/:id/inbox/cancel', async (c) => {
+  const orgId = c.get('orgId') || 1
+  const jobId = parseInt(c.req.param('id'))
+  if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
+  if (!job) return c.json({ error: 'Job not found' }, 404)
+
+  const result = await BatchQueueService.cancelQueuedBatch(orgId, jobId)
+  return c.json({
+    message: `${result.cancelledCount} antrean berhasil dibatalkan.`,
+    refundedCredits: result.refundedCredits,
+  })
+})
+
 inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
   const orgId = c.get('orgId') || 1
   const jobId = parseInt(c.req.param('id'))

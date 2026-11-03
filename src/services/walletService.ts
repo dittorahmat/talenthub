@@ -9,12 +9,23 @@ export interface WalletData {
   updatedAt: string
 }
 
+export type CreditTransactionType =
+  | 'INITIAL_GRANT'
+  | 'TRIAL_GRANT'
+  | 'PURCHASE'
+  | 'CV_SCREENING'
+  | 'RESERVED'
+  | 'SETTLED'
+  | 'REFUND'
+  | 'REFUND_CORRUPTED_FILE'
+  | 'REFUND_PROCESSING_ERROR'
+
 export interface TransactionData {
   id: number
   walletId: number
   organizationId: number
   amount: number
-  type: string
+  type: CreditTransactionType
   description: string | null
   balanceAfter: number
   createdAt: string
@@ -151,33 +162,32 @@ export async function reserveCredit(
 }
 
 /**
- * Finalizes deduction.
- * If reservationRef is provided and amount was already deducted during reserve, updates reservation
- * or logs completion with type 'CV_SCREENING'.
- * If amount is specified, records deduction of -amount.
+ * Finalizes deduction after reservation.
+ * Since reservation already debited the balance, commitCredit settles the transaction
+ * and updates the reservation note or logs settlement with amount 0 to prevent double debiting.
  */
 export async function commitCredit(
   orgId: number,
   reservationRef?: string,
   description?: string,
-  amount: number = 1
+  _amount: number = 1
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   const wallet = await getOrCreateWallet(orgId)
   const now = new Date().toISOString()
 
   const tx = sqlite.transaction(() => {
-    // Check if there is an existing RESERVED transaction to update to SETTLED/CV_SCREENING or insert record
+    // Audit log settlement row with amount 0 so balance sum remains exact and double debit is prevented
     const insertTxStmt = sqlite.prepare(`
       INSERT INTO credit_transactions (wallet_id, organization_id, amount, type, description, balance_after, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `)
-    const descText = description || (reservationRef ? `Komitmen kredit (Ref: ${reservationRef})` : `Komitmen screening CV`)
+    const descText = description || (reservationRef ? `Settled screening (Ref: ${reservationRef})` : `Komitmen screening CV selesai`)
     const txRecord = insertTxStmt.get(
       wallet.id,
       orgId,
-      -Math.abs(amount),
-      'CV_SCREENING',
+      0, // Amount is 0 because credit was already decremented during reserveCredit
+      'SETTLED',
       descText,
       wallet.balance,
       now

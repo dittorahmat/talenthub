@@ -344,6 +344,48 @@ export class BatchQueueService {
   }
 
   /**
+   * Cancels remaining queued items for a job inbox and refunds reserved credits.
+   */
+  static async cancelQueuedBatch(orgId: number, jobId: number): Promise<{
+    cancelledCount: number
+    refundedCredits: number
+  }> {
+    const jobState = jobBatchState.get(jobId)
+    const dbQueued = await db
+      .select()
+      .from(inboxItems)
+      .where(and(eq(inboxItems.jobId, jobId), eq(inboxItems.status, 'queued')))
+      .all() as any[]
+
+    let cancelledCount = 0
+    for (const item of dbQueued) {
+      await db.update(inboxItems).set({
+        status: 'dismissed',
+        rationale: 'Dibatalkan oleh pengguna (kredit dikembalikan)',
+      }).where(eq(inboxItems.id, item.id)).run()
+
+      if (jobState?.items.has(item.id)) {
+        jobState.items.delete(item.id)
+      }
+      cancelledCount++
+    }
+
+    if (cancelledCount > 0) {
+      await refundCredit(
+        orgId,
+        cancelledCount,
+        'REFUND',
+        `Pengembalian ${cancelledCount} kredit karena antrean batch dibatalkan`
+      )
+    }
+
+    return {
+      cancelledCount,
+      refundedCredits: cancelledCount,
+    }
+  }
+
+  /**
    * Get batch / real-time progress for a job inbox
    */
   static async getJobBatchStatus(jobId: number): Promise<BatchStatusResult> {

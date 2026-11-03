@@ -47,7 +47,7 @@ resumeRouter.post('/:id/resume', async (c) => {
 
     // 2. Atomically reserve 1 credit
     try {
-      await reserveCredit(orgId, 1, `AI Screening reservation untuk pelamar: ${applicant.name}`)
+      await reserveCredit(orgId, 1, `AI Screening untuk pelamar: ${applicant.name}`)
     } catch (err: any) {
       return c.json({
         error: 'INSUFFICIENT_CREDIT',

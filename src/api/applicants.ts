@@ -4,8 +4,57 @@ import { jobs, applicants, notes, activities } from '../db/schema'
 import { eq, desc, and } from 'drizzle-orm'
 import { OrgEnv } from '../middleware/orgContext'
 import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
+import crypto from 'crypto'
 
 export const applicantsRouter = new Hono<OrgEnv>()
+
+// In-memory token store for public candidate intelligence sharing
+const shareTokenStore = new Map<string, { applicantId: number; expiresAt: number }>()
+
+applicantsRouter.post('/:id/share-token', async (c) => {
+  const orgId = c.get('orgId') || 1
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+  const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+  if (!applicant) return c.notFound()
+
+  const token = crypto.randomBytes(16).toString('hex')
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
+  shareTokenStore.set(token, { applicantId: id, expiresAt })
+
+  return c.json({
+    token,
+    shareUrl: `/share/candidate/${token}`,
+    expiresAt: new Date(expiresAt).toISOString(),
+  })
+})
+
+applicantsRouter.get('/public/share/:token', async (c) => {
+  const token = c.req.param('token')
+  const entry = shareTokenStore.get(token)
+  if (!entry || entry.expiresAt < Date.now()) {
+    return c.json({ error: 'Tautan telah kadaluarsa atau tidak valid' }, 404)
+  }
+
+  const applicant = await db.select().from(applicants).where(eq(applicants.id, entry.applicantId)).get() as any
+  if (!applicant) return c.notFound()
+  const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get() as any
+
+  const matched = applicant.screeningMatched ? applicant.screeningMatched.split(', ').filter(Boolean) : []
+  const missing = applicant.screeningMissing ? applicant.screeningMissing.split(', ').filter(Boolean) : []
+
+  return c.json({
+    name: applicant.name,
+    jobTitle: job?.title ?? 'Posisi Pekerjaan',
+    score: applicant.screeningScore,
+    band: applicant.screeningBand,
+    verdict: applicant.screeningVerdict,
+    summary: applicant.screeningSummary,
+    matchedSkills: matched,
+    missingSkills: missing,
+    interviewQuestions: generateInterviewQuestions(missing),
+  })
+})
 
 applicantsRouter.get('/:id/screening', async (c) => {
   try {

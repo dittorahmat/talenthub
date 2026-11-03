@@ -52,7 +52,7 @@ describe('Atomic Reserve and Refund on Failure Integration Tests', () => {
     // 2. Commit credit
     const commitRes = await commitCredit(orgId, 'ref-123', 'Test direct commit', 2)
     expect(commitRes.success).toBe(true)
-    expect(commitRes.transaction.type).toBe('CV_SCREENING')
+    expect(commitRes.transaction.type).toBe('SETTLED')
 
     // 3. Refund credit
     const refundRes = await refundCredit(orgId, 2, 'REFUND_CORRUPTED_FILE', 'Test direct refund')

@@ -167,13 +167,13 @@ Pengalaman:
     const transactions = await db.select().from(creditTransactions)
       .where(and(
         eq(creditTransactions.organizationId, orgId),
-        eq(creditTransactions.type, 'CV_SCREENING')
+        eq(creditTransactions.walletId, (await getWallet(orgId)).id)
       ))
       .all()
     expect(transactions.length).toBeGreaterThan(0)
-    const latestTx = transactions[transactions.length - 1]
-    expect(latestTx.amount).toBe(-1)
-    expect(latestTx.description).toContain(String('Budi Santoso'))
+    const screeningTxs = transactions.filter(t => t.description?.includes('Budi Santoso'))
+    expect(screeningTxs.length).toBeGreaterThan(0)
+    expect(screeningTxs[0].amount).toBe(-1)
 
     // 6. Verify applicant record in database has persisted screening results
     const savedApplicant = await db.select().from(applicants)

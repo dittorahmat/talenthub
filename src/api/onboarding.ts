@@ -132,10 +132,20 @@ onboardingRouter.post('/verify-otp', async (c) => {
       return c.json({ error: 'Kode OTP telah kadaluarsa. Silakan ajukan pendaftaran ulang.' }, 400)
     }
 
-    // Double check domain/phone haven't been claimed in the meantime
-    const eligibility = await canClaimTrial(claim.corporateDomain, cleanPhone)
-    if (!eligibility.eligible) {
-      return c.json({ error: eligibility.reason }, 400)
+    // Double check domain/phone haven't been claimed in the meantime (only check verified claims to avoid self-blocking)
+    const alreadyClaimed = await db
+      .select()
+      .from(trialClaims)
+      .where(
+        and(
+          eq(trialClaims.corporateDomain, claim.corporateDomain),
+          eq(trialClaims.isVerified, 1)
+        )
+      )
+      .get()
+
+    if (alreadyClaimed) {
+      return c.json({ error: `Domain perusahaan ${claim.corporateDomain} telah mengklaim free trial sebelumnya.` }, 400)
     }
 
     const now = new Date().toISOString()
