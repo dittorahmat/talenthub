@@ -139,6 +139,78 @@ export async function deductCredit(
 }
 
 /**
+ * Reserve credit conditionally (balance >= amount) and log a ledger transaction with type 'RESERVED'.
+ * Deducts amount from balance immediately. Throws error if balance is insufficient.
+ */
+export async function reserveCredit(
+  orgId: number,
+  amount: number,
+  description?: string
+): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
+  return deductCredit(orgId, amount, 'RESERVED', description ?? `Reserve credit for processing`)
+}
+
+/**
+ * Finalizes deduction.
+ * If reservationRef is provided and amount was already deducted during reserve, updates reservation
+ * or logs completion with type 'CV_SCREENING'.
+ * If amount is specified, records deduction of -amount.
+ */
+export async function commitCredit(
+  orgId: number,
+  reservationRef?: string,
+  description?: string,
+  amount: number = 1
+): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
+  const wallet = await getOrCreateWallet(orgId)
+  const now = new Date().toISOString()
+
+  const tx = sqlite.transaction(() => {
+    // Check if there is an existing RESERVED transaction to update to SETTLED/CV_SCREENING or insert record
+    const insertTxStmt = sqlite.prepare(`
+      INSERT INTO credit_transactions (wallet_id, organization_id, amount, type, description, balance_after, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING *
+    `)
+    const descText = description || (reservationRef ? `Komitmen kredit (Ref: ${reservationRef})` : `Komitmen screening CV`)
+    const txRecord = insertTxStmt.get(
+      wallet.id,
+      orgId,
+      -Math.abs(amount),
+      'CV_SCREENING',
+      descText,
+      wallet.balance,
+      now
+    ) as any
+
+    return {
+      newBalance: wallet.balance,
+      transaction: mapTransactionRow(txRecord),
+    }
+  })
+
+  const res = tx()
+  return {
+    success: true,
+    newBalance: res.newBalance,
+    transaction: res.transaction,
+  }
+}
+
+/**
+ * Refund credit back to organization wallet atomically and log transaction with type 'REFUND' or specified type.
+ */
+export async function refundCredit(
+  orgId: number,
+  amount: number,
+  reason: string = 'REFUND',
+  description?: string
+): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
+  const descText = description || `Refund credit: ${reason}`
+  return addCredit(orgId, amount, reason, descText)
+}
+
+/**
  * Add credit to an organization's wallet.
  */
 export async function addCredit(

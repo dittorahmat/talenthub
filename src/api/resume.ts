@@ -5,8 +5,8 @@ import { eq, and } from 'drizzle-orm'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { OrgEnv } from '../middleware/orgContext'
-import { getWallet, deductCredit } from '../services/walletService'
-import { evaluateResume } from '../services/aiScreeningService'
+import { getWallet, reserveCredit, commitCredit, refundCredit } from '../services/walletService'
+import { evaluateResume, isCorruptedOrUnreadableBuffer } from '../services/aiScreeningService'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
@@ -45,9 +45,9 @@ resumeRouter.post('/:id/resume', async (c) => {
       return c.json({ error: 'File too large (max 5MB)' }, 400)
     }
 
-    // 2. Atomically deduct 1 credit
+    // 2. Atomically reserve 1 credit
     try {
-      await deductCredit(orgId, 1, 'CV_SCREENING', `AI Screening untuk pelamar: ${applicant.name}`)
+      await reserveCredit(orgId, 1, `AI Screening reservation untuk pelamar: ${applicant.name}`)
     } catch (err: any) {
       return c.json({
         error: 'INSUFFICIENT_CREDIT',
@@ -85,10 +85,56 @@ resumeRouter.post('/:id/resume', async (c) => {
       organizationId: orgId,
       applicantId: id,
       type: 'resume_upload',
-      description: `Resume diunggah: ${file.name} (1 kredit terpotong)`,
+      description: `Resume diunggah: ${file.name} (1 kredit di-reserve)`,
       user: 'HR Admin',
       timestamp: now,
     })
+
+    // Check if the file is unreadable / corrupted
+    const isCorrupt = isCorruptedOrUnreadableBuffer(buffer, file.name)
+    if (isCorrupt) {
+      // Automatic refund
+      await refundCredit(
+        orgId,
+        1,
+        'REFUND_CORRUPTED_FILE',
+        'Pengembalian 1 kredit karena file CV rusak atau tidak terbaca'
+      )
+
+      const errorSummary = 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke saldo dompet.'
+      const errorTime = new Date().toISOString()
+
+      await db.update(applicants).set({
+        screeningStatus: 'error',
+        screeningVerdict: 'Error',
+        screeningSummary: errorSummary,
+        screeningScore: null,
+        screeningBand: 'Weak',
+        updatedAt: errorTime,
+      }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+
+      await db.insert(activities).values({
+        organizationId: orgId,
+        applicantId: id,
+        type: 'screening_failed',
+        description: `Screening gagal: File rusak / tidak terbaca. 1 kredit otomatis dikembalikan ke dompet.`,
+        user: 'AI Screening System',
+        timestamp: errorTime,
+      })
+
+      return c.json({
+        success: false,
+        error: 'CORRUPTED_FILE',
+        message: 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke dompet Anda.',
+        screening_status: 'error',
+        screening_verdict: 'Error',
+        screening_summary: errorSummary,
+        refunded: true,
+      }, 422)
+    }
+
+    // Normal successful flow: Commit the deduction
+    await commitCredit(orgId, String(applicant.id), `AI Screening untuk pelamar: ${applicant.name}`)
 
     // Fetch related job title
     const jobRow = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()

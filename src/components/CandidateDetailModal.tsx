@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { orgFetch } from '../context/OrgContext'
 import { Candidate } from './CandidateCard'
 import { FileIcon, NoteIcon, ClockIcon, WhatsAppIcon } from './Icons'
+import { Candidate1PageSummaryModal } from './Candidate1PageSummaryModal'
+import { formatWhatsAppSummary, generateInterviewQuestions } from '../utils/summaryExport'
 
 interface Note {
   id: number
@@ -54,6 +56,8 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const [loading, setLoading] = useState(true)
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadError, setUploadError] = useState<{ message: string; isCreditError?: boolean } | null>(null)
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
 
   const loadData = () => {
     orgFetch(`/api/applicants/${candidate.id}`)
@@ -218,7 +222,38 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const screeningVerdict = deriveVerdictLocal(screeningBand, screeningVerdictRaw)
 
   const isProcessingStatus = screeningStatus === 'processing'
-  const isReadyStatus = screeningStatus === 'ready' && screeningScore != null
+  const isErrorStatus = screeningStatus === 'error' || screeningVerdictRaw?.toLowerCase() === 'error'
+  const isReadyStatus = !isErrorStatus && screeningStatus === 'ready' && screeningScore != null
+
+  const handleCopyWhatsAppSummary = async () => {
+    const text = formatWhatsAppSummary({
+      candidateName: candidate.name,
+      appliedRole: details?.job?.title || 'Posisi Terkait',
+      appliedDate: candidate.created_at ? new Date(candidate.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Hari ini',
+      score: screeningScore,
+      verdict: screeningVerdict,
+      summary: screeningSummary,
+      matchedSkills: matchedChips,
+      missingSkills: missingChips,
+      expYears: screeningExpYears,
+      interviewQuestions: details?.interview_questions || generateInterviewQuestions(missingChips, details?.job?.title || 'posisi ini')
+    })
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2500)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2500)
+    }
+  }
 
   return (
     <div
@@ -328,7 +363,28 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                aria-label="Bagikan Ringkasan ke Hiring Manager"
+                onClick={() => setShowSummaryModal(true)}
+                style={{
+                  background: '#0D9488',
+                  color: 'white',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <span>📄</span> Bagikan Ringkasan ke Hiring Manager
+              </button>
               <button
                 type="button"
                 aria-label="Kirim WhatsApp"
@@ -485,6 +541,27 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
               <span style={{ fontSize: '11px', color: '#64748B' }}>Biaya evaluasi AI: 1 kredit per CV</span>
             </div>
 
+            {/* Corrupted File / Screening Error Banner */}
+            {isErrorStatus && (
+              <div style={{
+                marginTop: '12px',
+                padding: '12px 14px',
+                background: '#FFFBEB',
+                border: '1px solid #FCD34D',
+                borderRadius: '8px',
+                color: '#92400E',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
+                <div>
+                  <strong>File tidak dapat dibaca / rusak.</strong> 1 Kredit telah dikembalikan ke dompet Anda. Silakan unggah ulang format PDF/DOCX yang valid.
+                </div>
+              </div>
+            )}
+
             {uploadError && (
               <div style={{
                 marginTop: '12px',
@@ -545,6 +622,11 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                   {screeningVerdict}
                 </span>
               )}
+              {isErrorStatus && (
+                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', color: '#B45309', background: '#FEF3C7', border: '1px solid #FDE68A' }}>
+                  Error / Rusak
+                </span>
+              )}
             </div>
 
             {isProcessingStatus ? (
@@ -559,6 +641,15 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                   <div style={{ height: '22px', borderRadius: '12px', background: '#F1F5F9', width: '72px' }} />
                 </div>
                 <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#94A3B8', fontStyle: 'italic' }}>Sistem sedang memproses data CV... mohon tunggu sebentar</p>
+              </div>
+            ) : isErrorStatus ? (
+              <div style={{ padding: '14px', background: '#FEF2F2', borderRadius: '8px', border: '1px solid #FECACA', color: '#991B1B' }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
+                  Gagal Memproses Berkas CV
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5 }}>
+                  {screeningSummary || 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke saldo dompet.'}
+                </p>
               </div>
             ) : isReadyStatus ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -605,6 +696,64 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                     Pengalaman: <strong>{screeningExpYears} tahun</strong>
                   </div>
                 )}
+
+                {/* Export & Share Shortcut in Screening Card */}
+                <div style={{
+                  marginTop: '6px',
+                  paddingTop: '12px',
+                  borderTop: '1px dashed #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  flexWrap: 'wrap'
+                }}>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                    Bagikan ringkasan evaluasi AI ke Hiring Manager:
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={handleCopyWhatsAppSummary}
+                      style={{
+                        background: copySuccess ? '#15803D' : '#F0FDF4',
+                        color: copySuccess ? 'white' : '#16A34A',
+                        border: '1px solid #BBF7D0',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <WhatsAppIcon size={13} color={copySuccess ? 'white' : '#16A34A'} />
+                      <span>{copySuccess ? 'Tersalin!' : 'Salin untuk WhatsApp'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSummaryModal(true)}
+                      style={{
+                        background: 'white',
+                        color: '#0D9488',
+                        border: '1px solid #0D9488',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <FileIcon size={13} color="#0D9488" />
+                      <span>1-Page PDF / Print</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '18px 12px', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
@@ -711,6 +860,31 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {showSummaryModal && (
+        <Candidate1PageSummaryModal
+          candidate={{
+            id: candidate.id,
+            name: candidate.name,
+            email: candidate.email,
+            phone: candidate.phone,
+            status: candidate.status,
+            created_at: candidate.created_at
+          }}
+          jobTitle={details?.job?.title || 'Posisi yang Dilamar'}
+          screening={{
+            score: screeningScore,
+            band: screeningBand,
+            verdict: screeningVerdict,
+            summary: screeningSummary,
+            matchedSkills: matchedChips,
+            missingSkills: missingChips,
+            expYears: screeningExpYears,
+            interviewQuestions: details?.interview_questions
+          }}
+          onClose={() => setShowSummaryModal(false)}
+        />
+      )}
     </div>
   )
 }
