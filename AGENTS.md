@@ -62,8 +62,9 @@
   - **Specificity Over Vagueness**: Hindari klaim kosong seperti "terbaik di kelasnya" atau "solusi revolusioner". Gunakan angka, waktu pengerjaan, dan bukti nyata (contoh: "20 kandidat gratis", "skrining dalam hitungan detik").
   - **Human Voice & Anti-AI Tells**: Dilarang menggunakan pola kalimat klise AI seperti:
     - Format kontras murahan ("Ini bukan sekadar X, ini adalah Y").
-    - Daftar negatif tanpa isi ("Tanpa ribet, tanpa pusing, tanpa repot").
+    - Daftar negatif tanpa isi ("Tanpa ribet, tanpa pusing, tanpa repot", "Tanpa biaya X"). Nyatakan proposisi secara afirmatif (misal: "Model bayar sesuai pemakaian", "Skema saldo prabayar fleksibel").
     - Kalimat bertele-tele yang menggantung di banyak koma.
+  - **Terminology Consistency**: Hindari mencampuradukkan padanan kata asing dan lokal dalam satu tampilan yang sama (misal: "Kesenjangan Keahlian / Gap" atau "ANTREAN" vs "LEDGER"). Gunakan padanan Indonesia yang konsisten atau pertahankan istilah teknis baku bila telah menjadi konvensi industri.
   - **The Three-Question Gate**: Setiap baris copy wajib lolos tiga uji:
     1. Dapatkah pembaca membayangkannya secara visual/nyata?
     2. Dapatkah klaim tersebut dibuktikan benar atau salah?

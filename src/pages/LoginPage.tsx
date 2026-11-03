@@ -166,44 +166,39 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             Akun Percobaan Cepat (Dev / QA)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('recruiter@tech1solusi.com', 'SuperPassword123!')}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'var(--raised)',
-                border: '1px solid var(--border)',
-                textAlign: 'left',
-                fontSize: '12px',
-                color: 'var(--text)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <span>Tech Satu Solusi (Recruiter)</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('superadmin@talenthub.ai', 'SuperAdmin2026!')}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'var(--raised)',
-                border: '1px solid var(--border)',
-                textAlign: 'left',
-                fontSize: '12px',
-                color: 'var(--text)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <span>TalentHub Superadmin</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
-            </button>
+            {[
+              {
+                label: 'Tech Satu Solusi (Recruiter)',
+                email: 'recruiter@tech1solusi.com',
+                pass: 'SuperPassword123!'
+              },
+              {
+                label: 'TalentHub Superadmin',
+                email: 'superadmin@talenthub.ai',
+                pass: 'SuperAdmin2026!'
+              }
+            ].map((preset) => (
+              <button
+                key={preset.email}
+                type="button"
+                onClick={() => handleQuickLogin(preset.email, preset.pass)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'var(--raised)',
+                  border: '1px solid var(--border)',
+                  textAlign: 'left',
+                  fontSize: '12px',
+                  color: 'var(--text)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <span>{preset.label}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
+              </button>
+            ))}
           </div>
         </div>
 

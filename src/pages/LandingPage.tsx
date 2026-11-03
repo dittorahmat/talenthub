@@ -31,9 +31,9 @@ export function LandingPage() {
 
           <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
             <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Alur Kerja</a>
-            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Keunggulan</a>
+            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Bukti & Fitur</a>
             <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Paket & Harga</a>
-            <a href="#/superadmin" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Superadmin</a>
+            <a href="#/superadmin" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Portal Superadmin</a>
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -64,7 +64,7 @@ export function LandingPage() {
                 borderRadius: 'var(--radius-control)'
               }}
             >
-              Klaim 20 Kredit Gratis
+              Coba Gratis
             </a>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function LandingPage() {
             </div>
             <div style={{ display: 'flex', gap: '16px', color: 'var(--muted)' }}>
               <span>ANTREAN: 0 SIAP</span>
-              <span style={{ color: 'var(--positive)' }}>LEDGER: TERVERIFIKASI</span>
+              <span style={{ color: 'var(--positive)' }}>BUKU BESAR: TERVERIFIKASI</span>
             </div>
           </div>
 
@@ -278,10 +278,10 @@ export function LandingPage() {
           <div style={{ maxWidth: '640px', marginBottom: '48px' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>PAKET KREDIT TRANSPARAN</div>
             <h2 className="editorial-headline" style={{ fontSize: '36px', color: 'var(--text)', marginBottom: '16px' }}>
-              Bayar per kandidat yang dievaluasi. Tanpa biaya langganan bulanan.
+              Bayar per kandidat yang dievaluasi. Skema saldo prabayar fleksibel.
             </h2>
             <p style={{ fontSize: '15px', color: 'var(--muted)', lineHeight: 1.6 }}>
-              Isi ulang saldo kredit instan via QRIS atau Virtual Account bank lokal. Kredit tidak pernah hangus dan dapat digunakan bersama seluruh tim rekrutmen Anda.
+              Isi ulang saldo kredit instan via QRIS atau Virtual Account bank lokal. Kredit berlaku selamanya dan dapat digunakan bersama seluruh tim rekrutmen Anda.
             </p>
           </div>
 

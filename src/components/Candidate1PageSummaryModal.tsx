@@ -398,7 +398,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                   <span style={{ color: '#DC2626', fontWeight: 800 }}>!</span>
                   <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Kesenjangan Keahlian / Gap ({missing.length})
+                    Kesenjangan Keahlian ({missing.length})
                   </h4>
                 </div>
                 {missing.length > 0 ? (
