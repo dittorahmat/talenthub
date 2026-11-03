@@ -47,3 +47,9 @@
 - **Scope Discipline & Test Fixtures**:
   - Hindari menanam credential rahasia/password sembarangan di komponen produksi; gunakan konfigurasi yang jelas atau helper testing yang aman.
   - Setiap rencana pemecahan tiket vertikal wajib diselesaikan secara menyeluruh di seluruh target komponen sebelum menandai selesai.
+- **Pre-Commit Automated Guardrails**:
+  - Repositori dilengkapi git pre-commit hook (`.git/hooks/pre-commit`) yang otomatis mengeksekusi `bun run check` dan `bun run test`.
+  - Agen dilarang melewati hook ini (`--no-verify`). Setiap kegagalan kompilasi TypeScript atau suite tes wajib diperbaiki sebelum commit dapat diterima.
+- **PowerShell Tool Economy & Safe File Manipulation**:
+  - Hindari eksekusi `node -e` inline dengan string/regex literal kompleks di CLI PowerShell untuk menghindari issue escaping kutip (`SyntaxError`).
+  - Selalu prioritaskan penggunaan tool native file editing (`edit_file` atau `write_file`).
