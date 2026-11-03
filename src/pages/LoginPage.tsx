@@ -170,12 +170,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {
                 label: 'Tech Satu Solusi (Recruiter)',
                 email: 'recruiter@tech1solusi.com',
-                pass: 'SuperPassword123!'
+                pass: 'Demo123!@#'
               },
               {
                 label: 'TalentHub Superadmin',
                 email: 'superadmin@talenthub.ai',
-                pass: 'SuperAdmin2026!'
+                pass: 'Admin123!@#'
               }
             ].map((preset) => (
               <button

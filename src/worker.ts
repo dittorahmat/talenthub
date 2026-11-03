@@ -54,6 +54,10 @@ app.route('/api/assistant', assistantRouter)
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url)
+    if (!url.pathname.startsWith('/api') && env.ASSETS) {
+      return env.ASSETS.fetch(request)
+    }
     return app.fetch(request, env, ctx)
   },
   async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
