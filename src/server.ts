@@ -1,19 +1,23 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/bun'
+import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
 import { whatsappRouter } from './api/whatsapp'
 import { resumeRouter } from './api/resume'
 import { inboxRouter } from './api/inbox'
 import { assistantRouter } from './api/assistant'
+import { organizationsRouter } from './api/organizations'
 
 const app = new Hono()
 
 app.use('*', cors({ origin: ['http://localhost:5173'], credentials: true }))
+app.use('/api/*', orgMiddleware)
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
+app.route('/api/organizations', organizationsRouter)
 app.route('/api/jobs', jobsRouter)
 app.route('/api/applicants', applicantsRouter)
 app.route('/api/whatsapp', whatsappRouter)

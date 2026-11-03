@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { orgFetch } from '../context/OrgContext'
 
 interface AddCandidateFormProps {
   jobId: number
@@ -62,7 +63,7 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
     setLoading(true)
     try {
       // 1. Create applicant
-      const res = await fetch('/api/applicants', {
+      const res = await orgFetch('/api/applicants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -86,7 +87,7 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
       if (resumeFile && created.id) {
         const formData = new FormData()
         formData.append('resume', resumeFile)
-        await fetch(`/api/applicants/${created.id}/resume`, {
+        await orgFetch(`/api/applicants/${created.id}/resume`, {
           method: 'POST',
           body: formData
         })
@@ -94,7 +95,7 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
 
       // 3. Add initial note if provided
       if (form.notes.trim() && created.id) {
-        await fetch(`/api/applicants/${created.id}/notes`, {
+        await orgFetch(`/api/applicants/${created.id}/notes`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

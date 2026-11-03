@@ -1,4 +1,5 @@
 import React from 'react'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 interface ModuleHubProps {
   onSelectModule: (key: string) => void
@@ -114,7 +115,9 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({ onSelectModule }) => {
               PT. Sirius Global Technologies &middot; Platform HR Terpadu
             </p>
           </div>
-          <span
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <WorkspaceSwitcher />
+            <span
             style={{
               fontSize: '11px',
               fontWeight: 700,
@@ -129,6 +132,7 @@ export const ModuleHub: React.FC<ModuleHubProps> = ({ onSelectModule }) => {
           >
             Demo · 8 Modul
           </span>
+          </div>
         </div>
 
         {/* Intro */}

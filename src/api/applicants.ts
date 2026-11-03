@@ -1,15 +1,17 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants, notes, activities } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
+import { OrgEnv } from '../middleware/orgContext'
 
-export const applicantsRouter = new Hono()
+export const applicantsRouter = new Hono<OrgEnv>()
 
 applicantsRouter.get('/:id/screening', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
     const status = (applicant as any).screeningStatus ?? 'pending'
@@ -43,19 +45,21 @@ applicantsRouter.get('/:id/screening', async (c) => {
 
 applicantsRouter.get('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
-    const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get()
-    const appNotes = await db.select().from(notes).where(eq(notes.applicantId, id)).orderBy(desc(notes.createdAt)).all()
-    const appActivities = await db.select().from(activities).where(eq(activities.applicantId, id)).orderBy(desc(activities.timestamp)).all()
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+    const appNotes = await db.select().from(notes).where(and(eq(notes.applicantId, id), eq(notes.organizationId, orgId))).orderBy(desc(notes.createdAt)).all()
+    const appActivities = await db.select().from(activities).where(and(eq(activities.applicantId, id), eq(activities.organizationId, orgId))).orderBy(desc(activities.timestamp)).all()
 
     const a = applicant as any
     return c.json({
       id: applicant.id,
+      organization_id: applicant.organizationId,
       job_id: applicant.jobId,
       name: applicant.name,
       email: applicant.email,
@@ -74,9 +78,9 @@ applicantsRouter.get('/:id', async (c) => {
       screening_matched: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
       screening_missing: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
       screening_exp_years: a.screeningExpYears ?? null,
-      job: job ? { id: job.id, title: job.title, location: job.location, remote: job.remote } : null,
+      job: job ? { id: job.id, organization_id: job.organizationId, title: job.title, location: job.location, remote: job.remote } : null,
       notes: appNotes.map(n => ({ id: n.id, applicantId: n.applicantId, text: n.text, author: n.author, created_at: n.createdAt })),
-      activities: appActivities.map(a => ({ id: a.id, applicantId: a.applicantId, type: a.type, description: a.description, user: a.user, timestamp: a.timestamp }))
+      activities: appActivities.map(act => ({ id: act.id, applicantId: act.applicantId, type: act.type, description: act.description, user: act.user, timestamp: act.timestamp }))
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -85,6 +89,7 @@ applicantsRouter.get('/:id', async (c) => {
 
 applicantsRouter.post('/', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const data = await c.req.json()
     const { name, email, phone, source, status, job_id } = data
 
@@ -92,9 +97,17 @@ applicantsRouter.post('/', async (c) => {
       return c.json({ error: 'Nama dan email wajib diisi' }, 400)
     }
 
+    const targetJobId = job_id || 1
+    // Verify job belongs to this org
+    const jobExists = await db.select().from(jobs).where(and(eq(jobs.id, targetJobId), eq(jobs.organizationId, orgId))).get()
+    if (!jobExists) {
+      return c.json({ error: 'Invalid job for this organization' }, 400)
+    }
+
     const now = new Date().toISOString()
     const inserted = await db.insert(applicants).values({
-      jobId: job_id || 1,
+      organizationId: orgId,
+      jobId: targetJobId,
       name,
       email,
       phone: phone || '',
@@ -105,6 +118,7 @@ applicantsRouter.post('/', async (c) => {
     }).returning().get()
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: inserted.id,
       type: 'status_change',
       description: `HR Admin menambahkan kandidat ${inserted.name} pada status ${inserted.status}`,
@@ -114,6 +128,7 @@ applicantsRouter.post('/', async (c) => {
 
     return c.json({
       id: inserted.id,
+      organization_id: inserted.organizationId,
       job_id: inserted.jobId,
       name: inserted.name,
       email: inserted.email,
@@ -129,22 +144,24 @@ applicantsRouter.post('/', async (c) => {
 
 applicantsRouter.patch('/:id/status', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
     const { status } = await c.req.json()
     if (!status) return c.json({ error: 'Status is required' }, 400)
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
     const now = new Date().toISOString()
     await db.update(applicants).set({
       status,
       updatedAt: now
-    }).where(eq(applicants.id, id))
+    }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
       type: 'status_change',
       description: `HR Admin memindahkan ${applicant.name} dari ${applicant.status} ke ${status}`,
@@ -160,14 +177,19 @@ applicantsRouter.patch('/:id/status', async (c) => {
 
 applicantsRouter.patch('/:id/notes', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
+
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
 
     const { text, author } = await c.req.json()
     if (!text || !text.trim()) return c.json({ error: 'Note text cannot be empty' }, 400)
 
     const now = new Date().toISOString()
     const insertedNote = await db.insert(notes).values({
+      organizationId: orgId,
       applicantId: id,
       text: text.trim(),
       author: author || 'HR Admin',
@@ -175,6 +197,7 @@ applicantsRouter.patch('/:id/notes', async (c) => {
     }).returning().get()
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
       type: 'note',
       description: `${insertedNote.author} menambahkan catatan: "${insertedNote.text.slice(0, 50)}${insertedNote.text.length > 50 ? '...' : ''}"`,
@@ -196,13 +219,14 @@ applicantsRouter.patch('/:id/notes', async (c) => {
 
 applicantsRouter.delete('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
-    await db.delete(applicants).where(eq(applicants.id, id))
+    await db.delete(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
     return c.json({ success: true, id })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -211,10 +235,14 @@ applicantsRouter.delete('/:id', async (c) => {
 
 applicantsRouter.get('/:id/activities', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const appActivities = await db.select().from(activities).where(eq(activities.applicantId, id)).orderBy(desc(activities.timestamp)).all()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
+
+    const appActivities = await db.select().from(activities).where(and(eq(activities.applicantId, id), eq(activities.organizationId, orgId))).orderBy(desc(activities.timestamp)).all()
 
     return c.json(appActivities.map(a => ({
       id: a.id,

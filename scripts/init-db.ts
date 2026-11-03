@@ -7,9 +7,18 @@ sqlite.exec(`
   DROP TABLE IF EXISTS notes;
   DROP TABLE IF EXISTS applicants;
   DROP TABLE IF EXISTS jobs;
+  DROP TABLE IF EXISTS organizations;
+
+  CREATE TABLE IF NOT EXISTS organizations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
 
   CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL DEFAULT 1 REFERENCES organizations(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     location TEXT NOT NULL,
     remote TEXT DEFAULT 'No',
@@ -18,6 +27,7 @@ sqlite.exec(`
 
   CREATE TABLE IF NOT EXISTS applicants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL DEFAULT 1 REFERENCES organizations(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     phone TEXT,
@@ -41,6 +51,7 @@ sqlite.exec(`
 
   CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL DEFAULT 1 REFERENCES organizations(id) ON DELETE CASCADE,
     applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
     author TEXT DEFAULT 'HR Admin',
@@ -49,6 +60,7 @@ sqlite.exec(`
 
   CREATE TABLE IF NOT EXISTS activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL DEFAULT 1 REFERENCES organizations(id) ON DELETE CASCADE,
     applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
     type TEXT NOT NULL,
     description TEXT NOT NULL,

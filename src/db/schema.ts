@@ -1,7 +1,15 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 
+export const organizations = sqliteTable('organizations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  createdAt: text('created_at').notNull(),
+})
+
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   location: text('location').notNull(),
   remote: text('remote').default('No'),
@@ -10,6 +18,7 @@ export const jobs = sqliteTable('jobs', {
 
 export const applicants = sqliteTable('applicants', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   email: text('email').notNull(),
   phone: text('phone'),
@@ -33,6 +42,7 @@ export const applicants = sqliteTable('applicants', {
 
 export const notes = sqliteTable('notes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   applicantId: integer('applicant_id').notNull().references(() => applicants.id, { onDelete: 'cascade' }),
   text: text('text').notNull(),
   author: text('author').default('HR Admin'),
@@ -41,6 +51,7 @@ export const notes = sqliteTable('notes', {
 
 export const activities = sqliteTable('activities', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   applicantId: integer('applicant_id').notNull().references(() => applicants.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   description: text('description').notNull(),

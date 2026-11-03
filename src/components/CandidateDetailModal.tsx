@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { orgFetch } from '../context/OrgContext'
 import { Candidate } from './CandidateCard'
 import { FileIcon, NoteIcon, ClockIcon, WhatsAppIcon } from './Icons'
 
@@ -53,7 +54,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const [loading, setLoading] = useState(true)
 
   const loadData = () => {
-    fetch(`/api/applicants/${candidate.id}`)
+    orgFetch(`/api/applicants/${candidate.id}`)
       .then(res => res.json())
       .then(data => {
         setDetails(data)
@@ -86,7 +87,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
         clearInterval(interval)
         return
       }
-      fetch(`/api/applicants/${candidate.id}`)
+      orgFetch(`/api/applicants/${candidate.id}`)
         .then(res => res.json())
         .then(data => {
           if (cancelled) return
@@ -111,7 +112,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
     e.preventDefault()
     if (!newNote.trim()) return
 
-    await fetch(`/api/applicants/${candidate.id}/notes`, {
+    await orgFetch(`/api/applicants/${candidate.id}/notes`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: newNote, author: 'HR Admin' })

@@ -1,19 +1,22 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
+import { OrgEnv } from '../middleware/orgContext'
 
-export const jobsRouter = new Hono()
+export const jobsRouter = new Hono<OrgEnv>()
 
 jobsRouter.get('/', async (c) => {
   try {
-    const allJobs = await db.select().from(jobs).all()
-    const allApplicants = await db.select().from(applicants).all()
+    const orgId = c.get('orgId') || 1
+    const allJobs = await db.select().from(jobs).where(eq(jobs.organizationId, orgId)).all()
+    const allApplicants = await db.select().from(applicants).where(eq(applicants.organizationId, orgId)).all()
 
     const jobsWithCounts = allJobs.map(job => {
       const jobApplicants = allApplicants.filter(a => a.jobId === job.id)
       return {
         id: job.id,
+        organization_id: job.organizationId,
         title: job.title,
         location: job.location,
         remote: job.remote,
@@ -30,6 +33,7 @@ jobsRouter.get('/', async (c) => {
 
 jobsRouter.post('/', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const body = await c.req.json()
     const { title, location, remote, posted_at } = body
     if (!title || !location) {
@@ -38,6 +42,7 @@ jobsRouter.post('/', async (c) => {
 
     const postedAtDate = posted_at || new Date().toISOString().split('T')[0]
     const inserted = await db.insert(jobs).values({
+      organizationId: orgId,
       title,
       location,
       remote: remote || 'No',
@@ -46,6 +51,7 @@ jobsRouter.post('/', async (c) => {
 
     return c.json({
       id: inserted.id,
+      organization_id: inserted.organizationId,
       title: inserted.title,
       location: inserted.location,
       remote: inserted.remote,
@@ -59,13 +65,14 @@ jobsRouter.post('/', async (c) => {
 
 jobsRouter.delete('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const job = await db.select().from(jobs).where(eq(jobs.id, id)).get()
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId))).get()
     if (!job) return c.notFound()
 
-    await db.delete(jobs).where(eq(jobs.id, id))
+    await db.delete(jobs).where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId)))
     return c.json({ success: true, id })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -74,18 +81,20 @@ jobsRouter.delete('/:id', async (c) => {
 
 jobsRouter.get('/:id', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const job = await db.select().from(jobs).where(eq(jobs.id, id)).get()
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId))).get()
     if (!job) return c.notFound()
 
-    const jobApplicants = await db.select().from(applicants).where(eq(applicants.jobId, id)).all()
+    const jobApplicants = await db.select().from(applicants).where(and(eq(applicants.jobId, id), eq(applicants.organizationId, orgId))).all()
 
     const mappedApplicants = jobApplicants.map(a => {
       const ap = a as any
       return {
         id: a.id,
+        organization_id: a.organizationId,
         job_id: a.jobId,
         name: a.name,
         email: a.email,
@@ -107,6 +116,7 @@ jobsRouter.get('/:id', async (c) => {
 
     return c.json({
       id: job.id,
+      organization_id: job.organizationId,
       title: job.title,
       location: job.location,
       remote: job.remote,

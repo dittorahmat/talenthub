@@ -1,15 +1,16 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { applicants, jobs, inboxItems, jobKnockouts, activities } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
+import { OrgEnv } from '../middleware/orgContext'
 
 const MAX_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
-export const inboxRouter = new Hono()
+export const inboxRouter = new Hono<OrgEnv>()
 
 function extractKeywords(text: string): string[] {
   const lower = text.toLowerCase()
@@ -50,9 +51,10 @@ function mapInboxRow(r: any) {
 }
 
 inboxRouter.get('/jobs/:id/inbox', async (c) => {
+  const orgId = c.get('orgId') || 1
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
-  const job = await db.select().from(jobs).where(eq(jobs.id, jobId)).get()
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
   const includeDismissed = c.req.query('include') === 'dismissed'
@@ -69,9 +71,10 @@ inboxRouter.get('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.post('/jobs/:id/inbox', async (c) => {
+  const orgId = c.get('orgId') || 1
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
-  const job = await db.select().from(jobs).where(eq(jobs.id, jobId)).get()
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
   let formData: FormData
@@ -98,58 +101,43 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
 
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (!(ALLOWED_EXTS as readonly string[]).includes(ext as any)) {
+      continue
+    }
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-
-    const isAllowed = (ALLOWED_EXTS as readonly string[]).includes(ext)
-    const isOversized = buffer.length > MAX_BYTES
-
-    if (!isAllowed || isOversized) {
-      const reason = !isAllowed ? `Tipe file tidak didukung: .${ext}` : `File terlalu besar (max 5MB)`
-      const now = new Date().toISOString()
-      const inserted = await db.insert(inboxItems).values({
-        jobId,
-        filename: file.name,
-        filePath: '',
-        fileUrl: '',
-        status: 'error',
-        name: sanitizeName(file.name),
-        email: null,
-        phone: null,
-        keywords: null,
-        score: null,
-        band: null,
-        verdict: null,
-        rationale: reason,
-        knockoutResult: null,
-        duplicateOf: null,
-        promotedApplicantId: null,
-        createdAt: now,
-      }).returning().get()
-      created.push(mapInboxRow(inserted))
+    if (buffer.length > MAX_BYTES) {
       continue
     }
 
     let extractedText = ''
-    try { extractedText = buffer.toString('utf-8') } catch { extractedText = '' }
-    const emailMatch = extractedText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/)
-    const extractedEmail = emailMatch ? emailMatch[0].toLowerCase() : null
-    const phoneMatch = extractedText.match(/(\+62[\s\-]?\d[\d\s\-]{8,}|0\d{9,13})/)
-    const extractedPhone = phoneMatch ? phoneMatch[0].trim() : null
+    try {
+      extractedText = buffer.toString('utf-8')
+    } catch {
+      extractedText = ''
+    }
 
+    const emailMatch = extractedText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
+    const phoneMatch = extractedText.match(/(?:\+62|62|08)[0-9\s-]{8,14}/)
+    const extractedEmail = emailMatch ? emailMatch[0] : null
+    const extractedPhone = phoneMatch ? phoneMatch[0].trim() : null
     const sanitizedName = sanitizeName(file.name)
 
-    let duplicateOf: number | null = null
     let isDuplicate = false
+    let duplicateOf: number | null = null
 
     if (extractedEmail) {
-      const allApps = await db.select().from(applicants).where(eq(applicants.jobId, jobId)).all()
-      const found = allApps.find((a: any) => a.email && a.email.toLowerCase() === extractedEmail)
-      if (found) { isDuplicate = true; duplicateOf = (found as any).id }
+      const normalizedEmail = extractedEmail.toLowerCase()
+      const allApps = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
+      const found = allApps.find((a: any) => a.email && a.email.toLowerCase() === normalizedEmail)
+      if (found) {
+        isDuplicate = true
+        duplicateOf = (found as any).id
+      }
     }
     if (!isDuplicate && extractedPhone) {
       const normalizedPhone = extractedPhone.replace(/\s|-/g, '')
-      const allApps2 = await db.select().from(applicants).where(eq(applicants.jobId, jobId)).all()
+      const allApps2 = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
       const foundPhone = allApps2.find((a: any) => a.phone && a.phone.replace(/\s|-/g, '') === normalizedPhone)
       if (foundPhone) { isDuplicate = true; duplicateOf = (foundPhone as any).id }
     }
@@ -159,7 +147,7 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
       if (dupInbox) { isDuplicate = true; duplicateOf = (dupInbox as any).id }
     }
     if (!isDuplicate) {
-      const allApps3 = await db.select().from(applicants).where(eq(applicants.jobId, jobId)).all()
+      const allApps3 = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
       const foundFilename = allApps3.find((a: any) => a.resumeFilename === file.name)
       if (foundFilename) { isDuplicate = true; duplicateOf = (foundFilename as any).id }
     }
@@ -271,10 +259,16 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.post('/inbox/:itemId/promote', async (c) => {
+  const orgId = c.get('orgId') || 1
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
   const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
   if (!item) return c.json({ error: 'Inbox item not found' }, 404)
+
+  // Verify parent job belongs to this org
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
+  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
+
   if (item.promotedApplicantId) return c.json({ error: 'Already promoted' }, 409)
   if (item.status === 'promoted') return c.json({ error: 'Already promoted' }, 409)
 
@@ -285,6 +279,7 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
 
   const now = new Date().toISOString()
   const inserted = await db.insert(applicants).values({
+    organizationId: orgId,
     jobId: item.jobId,
     name,
     email,
@@ -307,6 +302,7 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
   }).returning().get() as any
 
   await db.insert(activities).values({
+    organizationId: orgId,
     applicantId: inserted.id,
     type: 'status_change',
     description: `Kandidat dipromosikan dari inbox: ${inserted.name}`,
@@ -320,6 +316,7 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
     success: true,
     applicant: {
       id: inserted.id,
+      organization_id: inserted.organizationId,
       job_id: inserted.jobId,
       name: inserted.name,
       email: inserted.email,
@@ -332,10 +329,15 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
 })
 
 inboxRouter.post('/inbox/:itemId/dismiss', async (c) => {
+  const orgId = c.get('orgId') || 1
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
   const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
   if (!item) return c.json({ error: 'Inbox item not found' }, 404)
+
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
+  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
+
   await db.update(inboxItems).set({ status: 'dismissed' }).where(eq(inboxItems.id, itemId)).run()
   return c.json({ success: true, id: itemId })
 })

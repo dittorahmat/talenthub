@@ -80,7 +80,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
 
   const fetchInbox = useCallback(async () => {
     try {
-      const res = await fetch(`/api/jobs/${jobId}/inbox`)
+      const res = await orgFetch(`/api/jobs/${jobId}/inbox`)
       if (!res.ok) {
         if (res.status === 404) {
           setItems([])
@@ -159,7 +159,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       arr.forEach(f => fd.append('files', f))
       // also try 'cvs' fallback if backend expects that
       // primary is 'files'
-      const res = await fetch(`/api/jobs/${jobId}/inbox`, {
+      const res = await orgFetch(`/api/jobs/${jobId}/inbox`, {
         method: 'POST',
         body: fd
       })
@@ -185,7 +185,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
 
   const handleDismiss = async (item: InboxItem) => {
     try {
-      await fetch(`/api/inbox/${item.id}/dismiss`, { method: 'POST' })
+      await orgFetch(`/api/inbox/${item.id}/dismiss`, { method: 'POST' })
       await fetchInbox()
     } catch (e) {
       console.error(e)
@@ -198,7 +198,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     if (!st) return
     setPromoteState(prev => ({ ...prev, [String(item.id)]: { ...st, saving: true } }))
     try {
-      const res = await fetch(`/api/inbox/${item.id}/promote`, {
+      const res = await orgFetch(`/api/inbox/${item.id}/promote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: st.name.trim(), email: st.email.trim() })

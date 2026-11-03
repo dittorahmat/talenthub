@@ -1,15 +1,16 @@
 import { Hono } from 'hono'
 import { db } from '../db'
-import { applicants, activities, jobs } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { applicants, activities } from '../db/schema'
+import { eq, and } from 'drizzle-orm'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { mockScreening, KEYWORD_POOL, hashInt } from './screening'
+import { OrgEnv } from '../middleware/orgContext'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
-export const resumeRouter = new Hono()
+export const resumeRouter = new Hono<OrgEnv>()
 
 function extractKeywords(text: string): string[] {
   const lowerText = text.toLowerCase()
@@ -18,10 +19,11 @@ function extractKeywords(text: string): string[] {
 
 resumeRouter.post('/:id/resume', async (c) => {
   try {
+    const orgId = c.get('orgId') || 1
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
     if (!applicant) return c.notFound()
 
     const formData = await c.req.formData()
@@ -31,7 +33,7 @@ resumeRouter.post('/:id/resume', async (c) => {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
-    if (!(ALLOWED_EXTS as readonly string[]).includes(ext)) {
+    if (!(ALLOWED_EXTS as readonly string[]).includes(ext as any)) {
       return c.json({ error: 'Only PDF and DOCX files allowed' }, 400)
     }
     if (buffer.length > MAX_RESUME_BYTES) {
@@ -48,84 +50,89 @@ resumeRouter.post('/:id/resume', async (c) => {
     let extractedText = ''
     try {
       extractedText = buffer.toString('utf-8')
-    } catch (_) {}
-    const keywords = extractKeywords(extractedText)
+    } catch {
+      extractedText = ''
+    }
 
+    const matchedKeywords = extractKeywords(extractedText)
+    const keywordsStr = matchedKeywords.join(', ') || null
+
+    const resumeUrl = `/uploads/resumes/${filename}`
     const now = new Date().toISOString()
+
     await db.update(applicants).set({
+      resumeUrl,
       resumePath: filePath,
       resumeFilename: file.name,
-      resumeUrl: `/uploads/resumes/${filename}`,
-      resumeKeywords: keywords.join(', '),
+      resumeKeywords: keywordsStr,
       screeningStatus: 'processing',
-      updatedAt: now
-    }).where(eq(applicants.id, id))
+      screeningSummary: null,
+      screeningScore: null,
+      screeningBand: null,
+      screeningMatched: null,
+      screeningMissing: null,
+      screeningExpYears: null,
+      updatedAt: now,
+    }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
 
     await db.insert(activities).values({
+      organizationId: orgId,
       applicantId: id,
-      type: 'resume_view',
+      type: 'resume_upload',
       description: `Resume diunggah: ${file.name}`,
       user: 'HR Admin',
-      timestamp: now
+      timestamp: now,
     })
 
-    const delay = 2000 + (hashInt(id * 1009 + buffer.length) % 2001)
+    const applicantId = id
+    const candidateName = applicant.name
+    const resumeKeywordsSnapshot = keywordsStr
+
+    const delayMs = 3000 + (Math.abs(hashInt(applicantId * 7919 + file.name.length)) % 2001)
+
     setTimeout(async () => {
       try {
-        const fresh = await db.select().from(applicants).where(eq(applicants.id, id)).get()
+        const fresh = await db.select().from(applicants).where(and(eq(applicants.id, applicantId), eq(applicants.organizationId, orgId))).get()
         if (!fresh) return
-        const job = fresh.jobId ? await db.select().from(jobs).where(eq(jobs.id, fresh.jobId)).get() : null
-        const jobTitle = job?.title ?? 'Senior Frontend Engineer'
-        const result = mockScreening(
-          { id: fresh.id, name: fresh.name, resumeKeywords: fresh.resumeKeywords },
-          { title: jobTitle }
+
+        const screeningResult = mockScreening(
+          { id: applicantId, name: candidateName, resumeKeywords: resumeKeywordsSnapshot },
+          { title: 'Posisi Terkait' }
         )
-        const doneAt = new Date().toISOString()
+
+        const matchedStr = screeningResult.matched.join(', ') || null
+        const missingStr = screeningResult.missing.join(', ') || null
+
         await db.update(applicants).set({
           screeningStatus: 'ready',
-          screeningSummary: result.summary,
-          screeningScore: result.score,
-          screeningBand: result.band,
-          screeningMatched: result.matched.join(', '),
-          screeningMissing: result.missing.join(', '),
-          screeningExpYears: result.expYears,
-          updatedAt: doneAt,
-        }).where(eq(applicants.id, id))
+          screeningSummary: screeningResult.summary,
+          screeningScore: screeningResult.score,
+          screeningBand: screeningResult.band,
+          screeningMatched: matchedStr,
+          screeningMissing: missingStr,
+          screeningExpYears: screeningResult.expYears,
+          updatedAt: new Date().toISOString(),
+        }).where(and(eq(applicants.id, applicantId), eq(applicants.organizationId, orgId)))
+
         await db.insert(activities).values({
-          applicantId: id,
-          type: 'screening',
-          description: `AI Screening selesai: skor ${result.score} (${result.band})`,
-          user: 'Sistem',
-          timestamp: doneAt,
+          organizationId: orgId,
+          applicantId,
+          type: 'screening_complete',
+          description: `Screening AI selesai: Skor ${screeningResult.score}/100 (${screeningResult.band})`,
+          user: 'AI Screening System',
+          timestamp: new Date().toISOString(),
         })
-      } catch (_) {}
-    }, delay)
+      } catch (e) {
+        console.error('Async screening failed:', e)
+      }
+    }, delayMs)
 
     return c.json({
       success: true,
-      filename: file.name,
-      fileUrl: `/uploads/resumes/${filename}`,
-      keywords,
-      screeningStatus: 'processing'
-    })
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500)
-  }
-})
-
-resumeRouter.get('/:id/resume', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'))
-    if (isNaN(id)) return c.notFound()
-
-    const applicant = await db.select().from(applicants).where(eq(applicants.id, id)).get()
-    if (!applicant || !applicant.resumeUrl) return c.notFound()
-
-    return c.json({
-      filePath: applicant.resumePath,
-      fileUrl: applicant.resumeUrl,
-      filename: applicant.resumeFilename,
-      keywords: applicant.resumeKeywords ? applicant.resumeKeywords.split(', ') : []
+      resume_url: resumeUrl,
+      resume_filename: file.name,
+      resume_keywords: keywordsStr,
+      screening_status: 'processing',
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
