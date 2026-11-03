@@ -53,3 +53,18 @@
 - **PowerShell Tool Economy & Safe File Manipulation**:
   - Hindari eksekusi `node -e` inline dengan string/regex literal kompleks di CLI PowerShell untuk menghindari issue escaping kutip (`SyntaxError`).
   - Selalu prioritaskan penggunaan tool native file editing (`edit_file` atau `write_file`).
+
+## 6. Copywriting & Communication Standards (copywriting Skill)
+- Setiap update, penambahan, dan perombakan teks/konten antarmuka (Landing Page, modal onboarding, notifikasi, tombol CTA, error message, dan laporan eksekutif) **WAJIB** menerapkan prinsip dan arahan dari skill `copywriting` (`.agents/skills/copywriting`).
+- **Prinsip Utama Copywriting**:
+  - **Clarity Over Cleverness**: Utamakan kejelasan pesan daripada kalimat puitis atau metafora abstrak. Pembaca harus langsung paham apa fungsi aplikasi dan tindakan yang diharapkan.
+  - **Benefits Over Features**: Tampilkan apa keuntungan nyata bagi pengguna (HR/recruiter/hiring manager), bukan sekadar arsitektur teknis atau jeroan backend.
+  - **Specificity Over Vagueness**: Hindari klaim kosong seperti "terbaik di kelasnya" atau "solusi revolusioner". Gunakan angka, waktu pengerjaan, dan bukti nyata (contoh: "20 kandidat gratis", "skrining dalam hitungan detik").
+  - **Human Voice & Anti-AI Tells**: Dilarang menggunakan pola kalimat klise AI seperti:
+    - Format kontras murahan ("Ini bukan sekadar X, ini adalah Y").
+    - Daftar negatif tanpa isi ("Tanpa ribet, tanpa pusing, tanpa repot").
+    - Kalimat bertele-tele yang menggantung di banyak koma.
+  - **The Three-Question Gate**: Setiap baris copy wajib lolos tiga uji:
+    1. Dapatkah pembaca membayangkannya secara visual/nyata?
+    2. Dapatkah klaim tersebut dibuktikan benar atau salah?
+    3. Dapatkah kompetitor menulis kalimat yang sama persis (Swap Test)? Jika ya, pertajam dengan proposisi khas TalentHub.

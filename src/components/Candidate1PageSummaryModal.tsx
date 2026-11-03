@@ -171,7 +171,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
             <span style={{ fontSize: '18px' }}>📄</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
-                1-Page Candidate Intelligence Summary
+                Ringkasan Eksekutif 1-Halaman Kandidat
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
                 Format standar hiring manager untuk review cepat & wawancara
@@ -344,7 +344,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '16px' }}>💡</span>
                 <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  Executive AI Summary
+                  Ringkasan Eksekutif AI
                 </h4>
               </div>
               <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#334155' }}>
@@ -364,7 +364,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                   <span style={{ color: '#16A34A', fontWeight: 800 }}>✓</span>
                   <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Matched Core Skills ({matched.length})
+                    Keahlian Utama yang Cocok ({matched.length})
                   </h4>
                 </div>
                 {matched.length > 0 ? (
@@ -398,7 +398,7 @@ export const Candidate1PageSummaryModal: React.FC<Candidate1PageSummaryModalProp
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                   <span style={{ color: '#DC2626', fontWeight: 800 }}>!</span>
                   <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Missing Skills / Gaps ({missing.length})
+                    Kesenjangan Keahlian / Gap ({missing.length})
                   </h4>
                 </div>
                 {missing.length > 0 ? (

@@ -173,19 +173,19 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
               borderRadius: '4px',
               fontWeight: 600
             }}>
-              20 TRIAL CREDITS
+              GRATIS 20 KREDIT EVALUASI
             </span>
             <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-              Step {step === 'REGISTER' ? '1 of 2' : '2 of 2'}
+              Langkah {step === 'REGISTER' ? '1 dari 2' : '2 dari 2'}
             </span>
           </div>
           <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em' }}>
-            {step === 'REGISTER' ? 'Claim Free Corporate Trial' : 'Verify WhatsApp OTP'}
+            {step === 'REGISTER' ? 'Daftar Uji Coba Gratis Perusahaan' : 'Verifikasi OTP WhatsApp'}
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.5 }}>
             {step === 'REGISTER'
-              ? 'Enter your corporate organization details. Public email domains (gmail, yahoo, etc.) are restricted.'
-              : `Enter the 6-digit verification code sent to ${phoneWhatsapp}.`}
+              ? 'Masukkan detail profil perusahaan Anda. Pendaftaran uji coba gratis mensyaratkan domain email resmi kantor (contoh: hr@perusahaan.co.id).'
+              : `Masukkan 6-digit kode verifikasi yang dikirimkan ke nomor ${phoneWhatsapp}.`}
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
-                Company Name
+                Nama Perusahaan / Organisasi
               </label>
               <input
                 type="text"
@@ -231,7 +231,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
-                Corporate Admin Email
+                Email Kantor Administrator
               </label>
               <input
                 type="email"
@@ -249,13 +249,13 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                 }}
               />
               <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
-                Must be an authentic corporate domain (anti-abuse check)
+                Gunakan email korporat resmi (domain umum seperti @gmail atau @yahoo akan otomatis ditolak).
               </div>
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
-                WhatsApp Number
+                Nomor WhatsApp Aktif
               </label>
               <input
                 type="tel"
@@ -289,7 +289,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? 'Sending WhatsApp OTP...' : 'Send Verification OTP'}
+              {loading ? 'Mengirim OTP WhatsApp...' : 'Kirim Kode Verifikasi WhatsApp'}
             </button>
           </form>
         ) : (
@@ -305,7 +305,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                   color: 'var(--text)',
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>Testing Simulation OTP:</div>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>Kode Simulasi Testing (Dev):</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700, color: 'var(--chart-primary)' }}>
                   {mockOtpHint}
                 </div>
@@ -315,10 +315,10 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
-                  Enter 6-Digit OTP
+                  Masukkan 6-Digit Kode OTP
                 </label>
                 <span className="tabular-numbers" style={{ fontSize: '12px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
-                  {countdown > 0 ? `Expires in ${countdown}s` : 'Expired'}
+                  {countdown > 0 ? `Berlaku ${countdown} dtk` : 'Kedaluwarsa'}
                 </span>
               </div>
               <input
@@ -357,7 +357,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? 'Verifying & Granting Credits...' : 'Verify OTP & Activate 20 Credits'}
+              {loading ? 'Memverifikasi...' : 'Verifikasi OTP & Aktifkan 20 Kredit'}
             </button>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
@@ -372,7 +372,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                ← Edit Company Details
+                ← Ubah Data Perusahaan
               </button>
 
               <button
@@ -388,7 +388,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
                   textDecoration: canResend ? 'underline' : 'none'
                 }}
               >
-                Resend OTP
+                Kirim Ulang OTP
               </button>
             </div>
           </form>

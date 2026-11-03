@@ -70,14 +70,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               padding: '2px 8px',
               borderRadius: '4px'
             }}>
-              SECURE AUTH
+              AUTENTIKASI AMAN
             </span>
           </div>
           <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em' }}>
-            Log in to Workspace
+            Masuk ke Workspace
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
-            Enter your credentials to access your candidate screening queue.
+            Masukkan akun resmi perusahaan Anda untuk mengakses antrean skrining kandidat.
           </p>
         </div>
 
@@ -99,14 +99,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '18px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
-              Corporate Email
+              Email Perusahaan
             </label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="recruiter@company.com"
+              placeholder="recruiter@perusahaan.co.id"
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -121,7 +121,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <div style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
-                Password
+                Kata Sandi
               </label>
             </div>
             <input
@@ -156,14 +156,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               opacity: loading ? 0.7 : 1
             }}
           >
-            {loading ? 'Authenticating...' : 'Sign in to Workspace'}
+            {loading ? 'Memverifikasi...' : 'Masuk ke Workspace'}
           </button>
         </form>
 
         {/* Demo Testing Presets */}
         <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
-            Quick Verification Presets (Dev/QA)
+            Akun Percobaan Cepat (Dev / QA)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
@@ -183,7 +183,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               }}
             >
               <span>Tech Satu Solusi (Recruiter)</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
             </button>
             <button
               type="button"
@@ -202,20 +202,20 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               }}
             >
               <span>TalentHub Superadmin</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
             </button>
           </div>
         </div>
 
         {/* Register & Return Link */}
         <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)' }}>
-          Need a corporate workspace?{' '}
+          Belum memiliki workspace perusahaan?{' '}
           <a href="#/register" style={{ color: 'var(--chart-primary)', fontWeight: 600 }}>
-            Claim Free Trial
+            Daftar Uji Coba Gratis
           </a>
           <span style={{ margin: '0 8px' }}>·</span>
           <a href="#/" style={{ color: 'var(--muted)' }}>
-            Back to Home
+            Kembali ke Beranda
           </a>
         </div>
       </div>

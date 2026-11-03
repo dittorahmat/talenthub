@@ -30,9 +30,9 @@ export function LandingPage() {
           </div>
 
           <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Workflow</a>
-            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Evidence</a>
-            <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Ledger & Pricing</a>
+            <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Alur Kerja</a>
+            <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Keunggulan</a>
+            <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Paket & Harga</a>
             <a href="#/superadmin" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>Superadmin</a>
           </nav>
 
@@ -50,7 +50,7 @@ export function LandingPage() {
                 background: 'var(--surface)'
               }}
             >
-              Log in
+              Masuk
             </a>
             <a
               href="#/register"
@@ -64,7 +64,7 @@ export function LandingPage() {
                 borderRadius: 'var(--radius-control)'
               }}
             >
-              Claim 20 Free Credits
+              Klaim 20 Kredit Gratis
             </a>
           </div>
         </div>
@@ -81,13 +81,13 @@ export function LandingPage() {
             color: 'var(--muted)',
             marginBottom: '16px'
           }}>
-            Talent Screening Infrastructure · Southeast Asia
+            Infrastruktur Skrining Kandidat · Asia Tenggara
           </div>
           <h1 className="editorial-headline" style={{ fontSize: 'clamp(2.75rem, 5.5vw, 5rem)', color: 'var(--text)', marginBottom: '24px' }}>
-            Evaluate hundreds of resumes in seconds. Settle every credit with mathematical precision.
+            Skrining ratusan CV dalam hitungan detik. Bayar hanya untuk kandidat yang berhasil dinilai.
           </h1>
           <p style={{ fontSize: '18px', color: 'var(--muted)', maxWidth: '680px', lineHeight: 1.6, marginBottom: '32px' }}>
-            Built specifically for high-volume hiring teams. TalentHub couples asynchronous Cloudflare queue processing with an audit-grade double-entry credit ledger and objective AI fit scoring.
+            Dirancang khusus untuk tim rekrutmen bervolume tinggi. TalentHub memadukan pemrosesan antrean otomatis Cloudflare dengan pembukuan kredit ganda yang transparan dan penilaian kecocokan AI yang objektif.
           </p>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -103,7 +103,7 @@ export function LandingPage() {
                 textDecoration: 'none'
               }}
             >
-              Start Free Corporate Trial (20 Credits)
+              Coba Gratis 20 Kandidat Pertama
             </a>
             <a
               href="#/login"
@@ -118,7 +118,7 @@ export function LandingPage() {
                 textDecoration: 'none'
               }}
             >
-              Explore Live Demo Workspace
+              Jelajahi Demo Interaktif
             </a>
           </div>
         </div>
@@ -150,8 +150,8 @@ export function LandingPage() {
               <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>pipeline/senior-fullstack-engineer/screening</span>
             </div>
             <div style={{ display: 'flex', gap: '16px', color: 'var(--muted)' }}>
-              <span>QUEUE: 0 IDLE</span>
-              <span style={{ color: 'var(--positive)' }}>LEDGER: VERIFIED</span>
+              <span>ANTREAN: 0 SIAP</span>
+              <span style={{ color: 'var(--positive)' }}>LEDGER: TERVERIFIKASI</span>
             </div>
           </div>
 
@@ -160,11 +160,11 @@ export function LandingPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--muted)', background: 'var(--surface)' }}>
-                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Candidate</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Role Applied</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Fit Score</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Match Status</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 500, textAlign: 'right' }}>Credit Settlement</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Kandidat</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Posisi Dilamar</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Skor Kecocokan</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 500 }}>Rekomendasi</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 500, textAlign: 'right' }}>Status Saldo</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,11 +184,11 @@ export function LandingPage() {
                       fontSize: '11px',
                       fontWeight: 600
                     }}>
-                      STRONG MATCH
+                      SANGAT COCOK
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
-                    -1 CR (SETTLED)
+                    -1 KREDIT (SELESAI)
                   </td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -207,11 +207,11 @@ export function LandingPage() {
                       fontSize: '11px',
                       fontWeight: 600
                     }}>
-                      CONSIDER
+                      PERTIMBANGKAN
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
-                    -1 CR (SETTLED)
+                    -1 KREDIT (SELESAI)
                   </td>
                 </tr>
                 <tr>
@@ -230,11 +230,11 @@ export function LandingPage() {
                       fontSize: '11px',
                       fontWeight: 600
                     }}>
-                      REJECT
+                      TIDAK COCOK
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>
-                    -1 CR (SETTLED)
+                    -1 KREDIT (SELESAI)
                   </td>
                 </tr>
               </tbody>
@@ -248,24 +248,24 @@ export function LandingPage() {
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px' }}>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>01 / ARCHITECTURE</div>
-              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Cloudflare Queue Asynchrony</h3>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>01 / KECEPATAN</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Pemrosesan Antrean Cepat</h3>
               <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.6 }}>
-                Recruiters upload hundreds of PDF or TXT resumes in one drop. Our queue consumers orchestrate parsing and LLM screening concurrently without thread bottlenecks or browser timeouts.
+                Upload puluhan atau ratusan file CV PDF dan TXT sekaligus dalam satu drop. Sistem antrean memproses ekstraksi teks dan penilaian AI secara simultan tanpa risiko browser macet atau timeout.
               </p>
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>02 / INTEGRITY</div>
-              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Strict Double-Entry Ledger</h3>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>02 / KEPASTIAN BIAYA</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Jaminan Saldo Transparan</h3>
               <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.6 }}>
-                Every AI evaluation reserves credit atomically. Corrupted files and parsing faults trigger automatic immediate refunds. Your ledger balance always matches your bank of processed candidates.
+                Setiap evaluasi menggunakan sistem reservasi kredit yang aman. File rusak, corrupt, atau tidak terbaca otomatis memicu pengembalian kredit seketika (refund 100%) ke dompet Anda.
               </p>
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>03 / COLLABORATION</div>
-              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Executive 1-Page Summary</h3>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>03 / KOLABORASI</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Ringkasan Eksekutif 1 Halaman</h3>
               <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.6 }}>
-                Cut hiring manager review time by 80%. Generate a concise WhatsApp-formatted overview, structured interview questions based on candidate skill gaps, and secure tokenized share links.
+                Pangkas waktu review hiring manager hingga 80%. Hasilkan ringkasan siap kirim via WhatsApp, panduan pertanyaan wawancara adaptif berbasis gap keahlian, dan link token share yang aman.
               </p>
             </div>
           </div>
@@ -276,12 +276,12 @@ export function LandingPage() {
       <section id="pricing" style={{ borderTop: '1px solid var(--border)', background: 'var(--ground)', padding: '80px 32px' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
           <div style={{ maxWidth: '640px', marginBottom: '48px' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>TRANSPARENT LEDGER PACKAGES</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>PAKET KREDIT TRANSPARAN</div>
             <h2 className="editorial-headline" style={{ fontSize: '36px', color: 'var(--text)', marginBottom: '16px' }}>
-              Pay strictly per screened candidate. No monthly waste.
+              Bayar per kandidat yang dievaluasi. Tanpa biaya langganan bulanan.
             </h2>
             <p style={{ fontSize: '15px', color: 'var(--muted)', lineHeight: 1.6 }}>
-              Top up credits instantly via QRIS or Indonesian Virtual Accounts. Credits never expire and remain bound to your organization's multi-tenant workspace.
+              Isi ulang saldo kredit instan via QRIS atau Virtual Account bank lokal. Kredit tidak pernah hangus dan dapat digunakan bersama seluruh tim rekrutmen Anda.
             </p>
           </div>
 
@@ -297,16 +297,16 @@ export function LandingPage() {
               justifyContent: 'space-between'
             }}>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Starter Tier</div>
-                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>For single position screening batches</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Paket Pemula</div>
+                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Ideal untuk pembukaan 1 posisi kerja</div>
                 <div className="tabular-numbers" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>
                   Rp 150.000
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--chart-primary)', fontWeight: 600, marginBottom: '24px' }}>
-                  100 Verified AI Screenings
+                  100 Evaluasi CV Terverifikasi
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>
-                  Includes candidate fit scoring, gap analysis, and 1-page WhatsApp summary generation.
+                  Termasuk skor kecocokan AI, analisis kesenjangan skill, dan ringkasan eksekutif format WhatsApp.
                 </div>
               </div>
               <a
@@ -325,7 +325,7 @@ export function LandingPage() {
                   textDecoration: 'none'
                 }}
               >
-                Get Started
+                Mulai Sekarang
               </a>
             </div>
 
@@ -342,7 +342,7 @@ export function LandingPage() {
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>Growth Tier</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>Paket Pertumbuhan</div>
                   <span style={{
                     fontSize: '10px',
                     fontFamily: 'var(--font-mono)',
@@ -351,18 +351,18 @@ export function LandingPage() {
                     padding: '2px 8px',
                     borderRadius: '4px'
                   }}>
-                    RECOMMENDED
+                    PILIHAN TERBAIK
                   </span>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Ideal for growing hiring agencies & tech teams</div>
+                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Untuk agensi rekrutmen & tim teknologi berkembang</div>
                 <div className="tabular-numbers" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>
                   Rp 600.000
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--chart-primary)', fontWeight: 600, marginBottom: '24px' }}>
-                  500 Verified AI Screenings
+                  500 Evaluasi CV Terverifikasi
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>
-                  Full multi-tenant collaboration, async Cloudflare batch processing, and tokenized share links.
+                  Kolaborasi multi-pengguna, pemrosesan batch otomatis, dan tautan ringkasan kandidat berizin aman.
                 </div>
               </div>
               <a
@@ -380,7 +380,7 @@ export function LandingPage() {
                   textDecoration: 'none'
                 }}
               >
-                Claim Growth Package
+                Pilih Paket Pertumbuhan
               </a>
             </div>
 
@@ -395,16 +395,16 @@ export function LandingPage() {
               justifyContent: 'space-between'
             }}>
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>High Volume</div>
-                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Bulk seasonal recruitment campaigns</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Paket Volume Tinggi</div>
+                <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Perekrutan massal dan kampanye musiman</div>
                 <div className="tabular-numbers" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>
                   Rp 2.500.000
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--chart-primary)', fontWeight: 600, marginBottom: '24px' }}>
-                  2.500 Verified AI Screenings
+                  2.500 Evaluasi CV Terverifikasi
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>
-                  Priority queue processing, tailored qualification rubrics, and automated audit reports.
+                  Prioritas antrean tertinggi, rubrik evaluasi kustom per divisi, dan laporan audit transaksi lengkap.
                 </div>
               </div>
               <a
@@ -423,7 +423,7 @@ export function LandingPage() {
                   textDecoration: 'none'
                 }}
               >
-                Inquire High Volume
+                Pilih Volume Tinggi
               </a>
             </div>
           </div>
@@ -437,9 +437,9 @@ export function LandingPage() {
             © 2026 TalentHub AI · Production Worker: <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>talenthub.tech1solusi.workers.dev</code>
           </div>
           <div style={{ display: 'flex', gap: '24px' }}>
-            <a href="#/superadmin" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Superadmin Portal</a>
-            <a href="#/login" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Workspace Sign In</a>
-            <a href="#/register" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Corporate Free Trial</a>
+            <a href="#/superadmin" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Portal Superadmin</a>
+            <a href="#/login" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Masuk Workspace</a>
+            <a href="#/register" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Uji Coba Perusahaan Gratis</a>
           </div>
         </div>
       </footer>
