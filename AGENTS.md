@@ -32,3 +32,11 @@
   2. `bun run check` (`bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, build client, dan bundle Cloudflare Worker).
 - Dokumentasi akun default pengujian dan alur Better Auth tersimpan di [docs/auth-setup.md](docs/auth-setup.md).
 - Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`) dan hindari asumsi perintah POSIX seperti `ls`.
+
+## 5. Frontend & UI/UX Design Standards (design-taste-frontend Skill)
+- Setiap perubahan, penambahan, dan perombakan antarmuka frontend (Landing Page, Auth, Dashboard, Kanban, Screening Inbox, Modal Detail, Summary Export, Billing, Topup, dan Superadmin) **WAJIB** menerapkan prinsip dan arahan dari skill `design-taste-frontend` (`.agents/skills/design-taste-frontend`).
+- **Anti-Generic AI Slop**: Dilarang menggunakan generic AI templates (seperti teks headline 3 baris rata tengah seragam tanpa hierarki, badge hiasan tanpa fungsi, card berulang dengan background gradient pelangi murahan, border tebal tak beraturan, atau floating glowing blur berlebihan).
+- **Substansi & Hierarki Desain**:
+  - Halaman publik / marketing (`--sector saas`): Menggunakan tipografi editorial tegas, layout asimetris yang disengaja, konten nyata/substantif, dan preview produk asli.
+  - Aplikasi / workspace screens (`--app`): Mengikuti pedoman `references/app-screens.md` (border tenang, label kompak, kontras data tinggi, densitas informasi teratur, status badge fungsional, dan feedback visual real-time tanpa animasi dekoratif lambat).
+- **Validasi Visual & Build**: Setiap perubahan UI wajib bebas dari TypeScript type error dan lolos build Vite (`bun run check`).

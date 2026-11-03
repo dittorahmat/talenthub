@@ -24,7 +24,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
       const data: any = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Gagal masuk. Periksa kembali email dan password Anda.')
+        throw new Error(data.error || 'Authentication failed. Please verify your email and password.')
       }
 
       onLoginSuccess(data.user)
@@ -46,82 +46,83 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #F0FDFA 0%, #E2E8F0 100%)',
-      padding: '24px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      background: 'var(--ground)',
+      padding: '24px'
     }}>
       <div style={{
-        maxWidth: '440px',
+        maxWidth: '420px',
         width: '100%',
-        background: 'white',
-        borderRadius: '16px',
-        padding: '36px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        border: '1px solid #E2E8F0'
+        background: 'var(--surface)',
+        borderRadius: 'var(--radius-card)',
+        padding: '40px 32px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+        border: '1px solid var(--border)'
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '22px',
-            margin: '0 auto 12px'
-          }}>
-            T
+        {/* Header */}
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>TalentHub</span>
+            <span style={{
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              background: 'var(--pill-neutral-bg)',
+              color: 'var(--pill-neutral-ink)',
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              SECURE AUTH
+            </span>
           </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>Masuk ke TalentHub</h2>
-          <p style={{ fontSize: '14px', color: '#64748B', marginTop: '6px' }}>
-            Akses workspace Talent Intelligence & AI Screening
+          <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.02em' }}>
+            Log in to Workspace
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
+            Enter your credentials to access your candidate screening queue.
           </p>
         </div>
 
         {error && (
           <div style={{
-            background: '#FEF2F2',
-            border: '1px solid #F87171',
-            borderRadius: '8px',
-            padding: '12px 14px',
+            background: 'var(--pill-negative-bg)',
+            color: 'var(--pill-negative-ink)',
+            border: '1px solid #fecaca',
+            borderRadius: 'var(--radius-control)',
+            padding: '10px 14px',
             fontSize: '13px',
-            color: '#991B1B',
-            marginBottom: '20px'
+            marginBottom: '20px',
+            lineHeight: 1.4
           }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              Email Perusahaan
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>
+              Corporate Email
             </label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="nama@perusahaan.com"
+              placeholder="recruiter@company.com"
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
                 fontSize: '14px',
+                border: '1px solid var(--border)',
                 outline: 'none',
-                boxSizing: 'border-box'
+                background: 'var(--surface)'
               }}
             />
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Password</label>
-              <a href="#/login" style={{ fontSize: '12px', color: '#0D9488', textDecoration: 'none' }}>Lupa sandi?</a>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+                Password
+              </label>
             </div>
             <input
               type="password"
@@ -132,11 +133,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
                 fontSize: '14px',
+                border: '1px solid var(--border)',
                 outline: 'none',
-                boxSizing: 'border-box'
+                background: 'var(--surface)'
               }}
             />
           </div>
@@ -146,69 +146,55 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             disabled={loading}
             style={{
               width: '100%',
-              background: '#0D9488',
-              color: 'white',
+              padding: '11px',
+              background: 'var(--accent)',
+              color: '#ffffff',
               border: 'none',
-              padding: '12px',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '15px',
+              fontSize: '14px',
+              fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              boxShadow: '0 4px 6px -1px rgba(13, 148, 136, 0.3)'
+              opacity: loading ? 0.7 : 1
             }}
           >
-            {loading ? 'Memverifikasi...' : 'Masuk ke Workspace'}
+            {loading ? 'Authenticating...' : 'Sign in to Workspace'}
           </button>
         </form>
 
-        {/* Quick Demo Logins for Fast Dev Testing */}
-        <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', textAlign: 'center' }}>
-            ⚡ One-Click Testing Credentials
+        {/* Demo Quick Pick */}
+        <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
+            Verification Preset
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('superadmin@talenthub.ai', 'Admin123!@#')}
-              style={{
-                flex: 1,
-                background: '#EEF2FF',
-                border: '1px solid #C7D2FE',
-                borderRadius: '6px',
-                padding: '6px 8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#4338CA',
-                cursor: 'pointer'
-              }}
-            >
-              👑 Superadmin
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('recruiter@tech1solusi.com', 'Demo123!@#')}
-              style={{
-                flex: 1,
-                background: '#F0FDFA',
-                border: '1px solid #99F6E4',
-                borderRadius: '6px',
-                padding: '6px 8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#0F766E',
-                cursor: 'pointer'
-              }}
-            >
-              🏢 HR Recruiter
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleQuickLogin('recruiter@tech1solusi.com', 'SuperPassword123!')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              background: 'var(--raised)',
+              border: '1px solid var(--border)',
+              textAlign: 'left',
+              fontSize: '12px',
+              color: 'var(--text)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <span>Tech Satu Solusi (Default Recruiter)</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Fill Preset</span>
+          </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#64748B' }}>
-          Belum punya akun tim?{' '}
-          <a href="#/register" style={{ color: '#0D9488', fontWeight: 600, textDecoration: 'none' }}>
-            Klaim 20 Free Trial
+        {/* Register & Return Link */}
+        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)' }}>
+          Need a corporate workspace?{' '}
+          <a href="#/register" style={{ color: 'var(--chart-primary)', fontWeight: 600 }}>
+            Claim Free Trial
+          </a>
+          <span style={{ margin: '0 8px' }}>·</span>
+          <a href="#/" style={{ color: 'var(--muted)' }}>
+            Back to Home
           </a>
         </div>
       </div>
