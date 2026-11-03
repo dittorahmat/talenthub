@@ -60,6 +60,15 @@ interface SuperadminOverviewData {
   recentAuditLogs: AuditLog[]
 }
 
+interface InjectCreditResponse {
+  success?: boolean
+  error?: string
+  wallet?: {
+    organizationId: number
+    balance: number
+  }
+}
+
 export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
   const [data, setData] = useState<SuperadminOverviewData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -84,8 +93,9 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
       if (json.organizations?.length > 0 && selectedOrgId === null) {
         setSelectedOrgId(json.organizations[0].id)
       }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan sistem')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Terjadi kesalahan sistem'
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -95,10 +105,13 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
     fetchData()
   }, [])
 
-  const handleInjectCredit = async (amountToAdd?: number) => {
+  const handleInjectCredit = async (amountToExecute?: number) => {
     if (!selectedOrgId) return
-    const amt = amountToAdd || injectAmount
-    if (isNaN(amt) || amt === 0) return
+    const amt = amountToExecute !== undefined ? amountToExecute : injectAmount
+    if (isNaN(amt) || amt === 0) {
+      setInjectStatus({ type: 'error', message: 'Jumlah kredit harus berupa angka bukan nol.' })
+      return
+    }
 
     setInjecting(true)
     setInjectStatus(null)
@@ -113,23 +126,27 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
         body: JSON.stringify({
           organizationId: selectedOrgId,
           amount: amt,
-          note: injectNote || `Penyesuaian manual (${amt > 0 ? '+' : ''}${amt} kredit)`
+          note: injectNote || 'Penyesuaian saldo operasional oleh superadmin'
         })
       })
 
-      const result: any = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Gagal memperbarui saldo')
+      const result = (await res.json()) as InjectCreditResponse
+      if (!res.ok) {
+        throw new Error(result.error || 'Gagal melakukan mutasi saldo kredit.')
+      }
 
+      const newBal = result.wallet?.balance ?? '-'
       const targetOrg = data?.organizations.find((o) => o.id === selectedOrgId)
       setInjectStatus({
         type: 'success',
-        message: `Berhasil menambahkan ${amt} kredit ke ${targetOrg?.name || `ID #${selectedOrgId}`}. Saldo baru: ${result.wallet?.balance ?? '-'} kredit.`
+        message: `Berhasil menambahkan ${amt > 0 ? `+${amt}` : amt} kredit ke ${targetOrg?.name || `Org #${selectedOrgId}`}. Saldo baru: ${newBal} kredit.`
       })
       await fetchData()
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Terjadi galat saat memproses penyesuaian saldo.'
       setInjectStatus({
         type: 'error',
-        message: err.message || 'Gagal melakukan mutasi kredit'
+        message: msg
       })
     } finally {
       setInjecting(false)
@@ -142,102 +159,118 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
     return org.name.toLowerCase().includes(q) || org.slug.toLowerCase().includes(q) || org.id.toString() === q
   })
 
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-slate-200 selection:text-slate-900">
-      {/* Top Console Bar */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-20 px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-base tracking-tight text-slate-900">TalentHub</span>
-            <span className="text-xs font-mono font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-              Console · Superadmin
-            </span>
-          </div>
-          <span className="hidden md:inline text-xs text-slate-400 border-l border-slate-200 pl-4">
-            Pengelolaan Multi-Tenant & Audit Ledger
-          </span>
-        </div>
+  const selectedOrg = data?.organizations.find((o) => o.id === selectedOrgId)
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={fetchData}
-            disabled={loading}
-            className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3.5 py-1.5 rounded-md transition disabled:opacity-50"
-          >
-            {loading ? 'Menyinkronkan...' : 'Perbarui Data'}
-          </button>
-          <button
-            type="button"
-            onClick={onBackToApp}
-            className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3.5 py-1.5 rounded-md transition"
-          >
-            ← Kembali ke Workspace
-          </button>
+  const kpiCards = [
+    {
+      label: 'Total Tenant Aktif',
+      value: data ? data.totalTenants : '-',
+      caption: 'Organisasi terdaftar di database D1'
+    },
+    {
+      label: 'Total Pengguna Terverifikasi',
+      value: data ? data.totalUsers : '-',
+      caption: 'Akun session Better Auth'
+    },
+    {
+      label: 'Antrean Batch Terakhir',
+      value: data ? data.recentBatches.length : '-',
+      caption: 'Aktivitas Cloudflare Queue'
+    }
+  ]
+
+  return (
+    <div className="min-h-screen bg-[var(--ground)] text-slate-800 flex flex-col font-sans selection:bg-slate-200 selection:text-slate-900">
+      {/* Top Header - Consistent with Workspace Bar */}
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-20 shadow-xs">
+        <div className="max-w-7xl mx-auto px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-9 h-9 rounded-md bg-slate-900 flex items-center justify-center text-white font-mono font-bold text-base shadow-xs">
+              T
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="font-bold text-xl tracking-tight text-slate-900 leading-none">
+                  TalentHub
+                </h1>
+                <span className="text-[11px] font-mono font-semibold tracking-wide uppercase text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  Superadmin Console
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Pengelolaan Multi-Tenant, Ledger Transaksi & Kontrol Antrean Platform
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3.5 py-2 rounded-md transition shadow-xs disabled:opacity-50"
+            >
+              {loading ? 'Menyinkronkan...' : 'Perbarui Data'}
+            </button>
+            <button
+              type="button"
+              onClick={onBackToApp}
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3.5 py-2 rounded-md transition"
+            >
+              ← Kembali ke Workspace
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-8 py-8 md:py-10 space-y-8">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800 shadow-xs">
             <span className="font-semibold">Galat koneksi:</span> {error}
           </div>
         )}
 
-        {/* Utilitarian KPI Row */}
+        {/* Distinct 3-Card KPI Section */}
         <section aria-label="Ringkasan Platform">
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border border-slate-200 rounded-lg bg-white shadow-xs">
-            <div className="p-6">
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Tenant Aktif</div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
-                {data ? data.totalTenants : '-'}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {kpiCards.map((kpi) => (
+              <div key={kpi.label} className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                    {kpi.label}
+                  </span>
+                  <div className="text-3xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
+                    {kpi.value}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
+                  {kpi.caption}
+                </div>
               </div>
-              <div className="text-[12px] text-slate-500 mt-1">Organisasi terdaftar di database D1</div>
-            </div>
-
-            <div className="p-6">
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Pengguna Terverifikasi</div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
-                {data ? data.totalUsers : '-'}
-              </div>
-              <div className="text-[12px] text-slate-500 mt-1">Akun session Better Auth</div>
-            </div>
-
-            <div className="p-6">
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Antrean Batch Terakhir</div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
-                {data ? data.recentBatches.length : '-'}
-              </div>
-              <div className="text-[12px] text-slate-500 mt-1">Aktivitas Cloudflare Queue</div>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* Credit Ledger Adjustment Form */}
-        <section className="border border-slate-200 rounded-lg bg-white p-6 space-y-5 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4">
+        {/* Structured Form Card: Credit Ledger Adjustment */}
+        <section className="bg-white border border-slate-200 rounded-xl p-6 md:p-8 space-y-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-5">
             <div>
-              <h2 className="text-sm font-bold tracking-tight text-slate-900">Penyesuaian Saldo Ledger (Superadmin Grant)</h2>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Penyesuaian Saldo Ledger (Superadmin Grant)
+              </h2>
               <p className="text-xs text-slate-500 mt-1">
                 Mutasi saldo dompet tenant dicatat langsung ke ledger transaksi resmi dengan tipe{' '}
-                <code className="text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-[11px]">SUPERADMIN_ADJUSTMENT</code>.
+                <code className="text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-[11px]">
+                  SUPERADMIN_ADJUSTMENT
+                </code>.
               </p>
             </div>
-            {selectedOrgId && data?.organizations && (
-              <div className="text-xs font-mono text-slate-600 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-200">
-                Target: Org #{selectedOrgId} (Saldo:{' '}
-                <span className="text-slate-900 font-bold">
-                  {data.organizations.find((o) => o.id === selectedOrgId)?.balance ?? 0}
-                </span>{' '}
-                kredit)
-              </div>
-            )}
           </div>
 
           {injectStatus && (
             <div
-              className={`text-xs p-3.5 rounded-md border ${
+              className={`text-xs p-4 rounded-lg border ${
                 injectStatus.type === 'success'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-medium'
                   : 'bg-red-50 border-red-200 text-red-800'
@@ -247,88 +280,121 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <div className="md:col-span-4">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tenant Organisasi</label>
-              <select
-                value={selectedOrgId || ''}
-                onChange={(e) => setSelectedOrgId(Number(e.target.value))}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 font-sans shadow-xs"
-              >
-                {data?.organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name} (Saldo: {org.balance} kredit)
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-4">
+            {/* Row 1: Target Tenant & Saldo Saat Ini + Quick Presets */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+              <div className="lg:col-span-5">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Tenant Organisasi Tujuan
+                </label>
+                <select
+                  value={selectedOrgId || ''}
+                  onChange={(e) => setSelectedOrgId(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 font-sans shadow-xs"
+                >
+                  {data?.organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name} (#{org.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-3">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Saldo Saat Ini
+                </label>
+                <div className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs font-mono text-slate-700 shadow-xs flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px]">Org #{selectedOrgId ?? '-'}:</span>
+                  <span className="font-bold text-slate-900 tabular-nums">
+                    {selectedOrg?.balance ?? 0} <span className="font-normal text-slate-500 text-[11px]">kredit</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="lg:col-span-4">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Preset Cepat (Isi Form)
+                </label>
+                <div className="flex items-center gap-2">
+                  {[50, 100, 250, 500].map((preset) => (
+                    <button
+                      type="button"
+                      key={preset}
+                      disabled={injecting || !selectedOrgId}
+                      onClick={() => setInjectAmount(preset)}
+                      className={`flex-1 text-xs font-mono font-medium py-2 px-2.5 rounded-lg transition disabled:opacity-50 text-center shadow-xs border ${
+                        injectAmount === preset
+                          ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                          : 'text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border-slate-200'
+                      }`}
+                    >
+                      +{preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Jumlah Kredit</label>
-              <input
-                type="number"
-                value={injectAmount}
-                onChange={(e) => setInjectAmount(Number(e.target.value))}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 font-mono shadow-xs"
-              />
-            </div>
+            {/* Row 2: Amount, Audit Note & Submit Button */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end pt-2">
+              <div className="md:col-span-3">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Jumlah Kredit
+                </label>
+                <input
+                  type="number"
+                  value={injectAmount}
+                  onChange={(e) => setInjectAmount(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 font-mono shadow-xs"
+                />
+              </div>
 
-            <div className="md:col-span-4">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Catatan Audit</label>
-              <input
-                type="text"
-                value={injectNote}
-                onChange={(e) => setInjectNote(e.target.value)}
-                placeholder="Alasan penyesuaian saldo..."
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 shadow-xs"
-              />
-            </div>
+              <div className="md:col-span-6">
+                <label className="block text-xs font-semibold text-slate-700 mb-2">
+                  Catatan Audit / Alasan Mutasi
+                </label>
+                <input
+                  type="text"
+                  value={injectNote}
+                  onChange={(e) => setInjectNote(e.target.value)}
+                  placeholder="Contoh: Penyesuaian saldo operasional..."
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 shadow-xs"
+                />
+              </div>
 
-            <div className="md:col-span-2 flex gap-2">
-              <button
-                type="button"
-                disabled={injecting || !selectedOrgId}
-                onClick={() => handleInjectCredit()}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2 px-3 rounded-md transition shadow-xs disabled:opacity-50 text-center"
-              >
-                {injecting ? 'Memproses...' : 'Terapkan'}
-              </button>
+              <div className="md:col-span-3">
+                <button
+                  type="button"
+                  disabled={injecting || !selectedOrgId}
+                  onClick={() => handleInjectCredit()}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded-lg transition shadow-xs disabled:opacity-50 text-center flex items-center justify-center gap-2"
+                >
+                  {injecting ? 'Memproses...' : 'Terapkan Mutasi'}
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-            <span className="text-[11px] font-medium text-slate-500">Preset Cepat:</span>
-            {[50, 100, 250, 500].map((preset) => (
-              <button
-                type="button"
-                key={preset}
-                disabled={injecting || !selectedOrgId}
-                onClick={() => {
-                  setInjectAmount(preset)
-                  handleInjectCredit(preset)
-                }}
-                className="text-[11px] font-mono text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded transition disabled:opacity-50"
-              >
-                +{preset}
-              </button>
-            ))}
           </div>
         </section>
 
-        {/* Tenant Organizations Table */}
-        <section className="border border-slate-200 rounded-lg bg-white overflow-hidden shadow-xs">
-          <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Tenant Organizations Table Card */}
+        <section className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-sm font-bold tracking-tight text-slate-900">Daftar Tenant Organisasi</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Seluruh ruang kerja dan dompet kredit terdaftar.</p>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Daftar Tenant Organisasi
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Seluruh ruang kerja dan dompet kredit terdaftar dalam platform.
+              </p>
             </div>
             <div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama atau slug..."
-                className="w-64 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 shadow-xs"
+                placeholder="Cari nama atau slug tenant..."
+                className="w-full sm:w-72 bg-white border border-slate-300 rounded-lg px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 shadow-xs"
               />
             </div>
           </div>
@@ -336,29 +402,29 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-5 font-semibold w-20">ID</th>
-                  <th className="py-3.5 px-5 font-semibold">Nama Organisasi</th>
-                  <th className="py-3.5 px-5 font-semibold">Slug Tenant</th>
-                  <th className="py-3.5 px-5 font-semibold text-right">Saldo Dompet</th>
-                  <th className="py-3.5 px-5 font-semibold text-center">Pengguna</th>
-                  <th className="py-3.5 px-5 font-semibold text-right">Aksi</th>
+                <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-600 uppercase tracking-wider text-[11px]">
+                  <th className="py-4 px-6 font-semibold w-24">ID</th>
+                  <th className="py-4 px-6 font-semibold">Nama Organisasi</th>
+                  <th className="py-4 px-6 font-semibold">Slug Tenant</th>
+                  <th className="py-4 px-6 font-semibold text-right">Saldo Dompet</th>
+                  <th className="py-4 px-6 font-semibold text-center">Pengguna</th>
+                  <th className="py-4 px-6 font-semibold text-right">Aksi Cepat</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredOrgs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-slate-500">
+                    <td colSpan={6} className="py-12 text-center text-slate-500">
                       Tidak ada tenant yang cocok dengan kriteria pencarian.
                     </td>
                   </tr>
                 ) : (
                   filteredOrgs.map((org) => (
-                    <tr key={org.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-5 font-mono text-slate-400">#{org.id}</td>
-                      <td className="py-3.5 px-5 font-semibold text-slate-900">{org.name}</td>
-                      <td className="py-3.5 px-5 font-mono text-slate-500 text-[11px]">{org.slug}</td>
-                      <td className="py-3.5 px-5 text-right font-mono tabular-nums">
+                    <tr key={org.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className="py-4 px-6 font-mono text-slate-400">#{org.id}</td>
+                      <td className="py-4 px-6 font-semibold text-slate-900">{org.name}</td>
+                      <td className="py-4 px-6 font-mono text-slate-500 text-[11px]">{org.slug}</td>
+                      <td className="py-4 px-6 text-right font-mono tabular-nums">
                         <span
                           className={`font-bold ${
                             org.balance > 0 ? 'text-slate-900' : 'text-slate-400'
@@ -368,8 +434,8 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
                         </span>{' '}
                         <span className="text-slate-400 text-[11px]">kredit</span>
                       </td>
-                      <td className="py-3.5 px-5 text-center font-mono text-slate-600">{org.userCount}</td>
-                      <td className="py-3.5 px-5 text-right">
+                      <td className="py-4 px-6 text-center font-mono text-slate-600">{org.userCount}</td>
+                      <td className="py-4 px-6 text-right">
                         <button
                           type="button"
                           onClick={() => {
@@ -377,7 +443,7 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
                             setInjectAmount(100)
                             handleInjectCredit(100)
                           }}
-                          className="text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1 rounded transition"
+                          className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3.5 py-1.5 rounded-md transition shadow-xs"
                         >
                           +100 Kredit
                         </button>
@@ -390,44 +456,46 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
           </div>
         </section>
 
-        {/* Audit Trail Panel */}
-        <section className="border border-slate-200 rounded-lg bg-white overflow-hidden shadow-xs">
-          <div className="p-5 border-b border-slate-100">
-            <h2 className="text-sm font-bold tracking-tight text-slate-900">Log Audit Transaksi Kredit Terkini</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              15 mutasi ledger terakhir di seluruh organisasi untuk pengawasan operasional.
+        {/* Audit Trail Panel Card */}
+        <section className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="p-6 border-b border-slate-100">
+            <h2 className="text-base font-bold tracking-tight text-slate-900">
+              Log Audit Transaksi Kredit Terkini
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              15 mutasi ledger terakhir di seluruh organisasi untuk pengawasan dan kepatuhan operasional.
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-5 font-semibold w-40">Waktu</th>
-                  <th className="py-3.5 px-5 font-semibold">Organisasi</th>
-                  <th className="py-3.5 px-5 font-semibold">Tipe Mutasi</th>
-                  <th className="py-3.5 px-5 font-semibold text-right">Jumlah</th>
-                  <th className="py-3.5 px-5 font-semibold text-right">Saldo Akhir</th>
-                  <th className="py-3.5 px-5 font-semibold">Keterangan</th>
+                <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-600 uppercase tracking-wider text-[11px]">
+                  <th className="py-4 px-6 font-semibold w-48">Waktu Transaksi</th>
+                  <th className="py-4 px-6 font-semibold">Organisasi</th>
+                  <th className="py-4 px-6 font-semibold">Tipe Mutasi</th>
+                  <th className="py-4 px-6 font-semibold text-right">Jumlah</th>
+                  <th className="py-4 px-6 font-semibold text-right">Saldo Akhir</th>
+                  <th className="py-4 px-6 font-semibold">Keterangan Audit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
                 {!data?.recentAuditLogs || data.recentAuditLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-slate-500">
+                    <td colSpan={6} className="py-12 text-center text-slate-500">
                       Belum ada catatan mutasi transaksi kredit di ledger.
                     </td>
                   </tr>
                 ) : (
                   data.recentAuditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-5 font-mono text-slate-500 text-[11px]">
+                    <tr key={log.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className="py-4 px-6 font-mono text-slate-500 text-[11px]">
                         {formatTimestamp(log.createdAt)}
                       </td>
-                      <td className="py-3.5 px-5 font-medium text-slate-900">
+                      <td className="py-4 px-6 font-medium text-slate-900">
                         {log.organizationName || `Org #${log.organizationId}`}
                       </td>
-                      <td className="py-3.5 px-5 font-mono text-[11px]">
+                      <td className="py-4 px-6 font-mono text-[11px]">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                             BADGE_STYLES_BY_TRANSACTION_TYPE[log.type] || 'border-slate-200 bg-slate-100 text-slate-600'
@@ -437,16 +505,16 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
                         </span>
                       </td>
                       <td
-                        className={`py-3.5 px-5 text-right font-mono tabular-nums font-bold ${
+                        className={`py-4 px-6 text-right font-mono tabular-nums font-bold ${
                           log.amount > 0 ? 'text-teal-700' : log.amount < 0 ? 'text-rose-700' : 'text-slate-500'
                         }`}
                       >
                         {log.amount > 0 ? `+${log.amount}` : log.amount}
                       </td>
-                      <td className="py-3.5 px-5 text-right font-mono tabular-nums text-slate-700 font-medium">
+                      <td className="py-4 px-6 text-right font-mono tabular-nums text-slate-700 font-medium">
                         {log.balanceAfter}
                       </td>
-                      <td className="py-3.5 px-5 text-slate-600 max-w-sm truncate" title={log.description || ''}>
+                      <td className="py-4 px-6 text-slate-600 max-w-sm truncate" title={log.description || ''}>
                         {log.description || '-'}
                       </td>
                     </tr>

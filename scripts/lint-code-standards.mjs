@@ -78,6 +78,27 @@ if (superadminContent.includes('type: string') && !superadminContent.includes('C
   })
 }
 
+// 2a. Check for Spacious Layout & Anti-Dempet standard in SuperadminPortal
+if (!superadminContent.includes('space-y-8') && !superadminContent.includes('space-y-6')) {
+  VIOLATIONS.push({
+    file: superadminFile,
+    line: 1,
+    reason: 'Layout Dempet Violation: Main container SuperadminPortal wajib menggunakan vertical breathing room (space-y-8).'
+  })
+}
+if (/py-1\b|py-1\.5\b|py-2\b/i.test(superadminContent) && /<td|<th/i.test(superadminContent)) {
+  const tableLines = superadminContent.split('\n')
+  tableLines.forEach((line, idx) => {
+    if (/(<td|<th)[^>]*\bpy-(1|1\.5|2)\b/i.test(line)) {
+      VIOLATIONS.push({
+        file: superadminFile,
+        line: idx + 1,
+        reason: 'Table Cell Dempet Violation: Padding sel tabel terlalu rapat. Wajib gunakan padding lega (py-3.5 atau py-4).'
+      })
+    }
+  })
+}
+
 // 2b. Check for unsafe type assertion in src/api/superadmin.ts
 const superadminApiFile = join(process.cwd(), 'src/api/superadmin.ts')
 const superadminApiContent = readFileSync(superadminApiFile, 'utf-8')
