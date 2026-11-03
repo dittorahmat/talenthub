@@ -69,7 +69,18 @@ lines.forEach((line, idx) => {
   }
 })
 
-// 2. Check for Primitive Obsession on CreditTransactionType in Superadmin Portal
+// 2. Check for CSS Layering & Star Reset in index.css (preventing Tailwind v4 specificity collapse)
+const indexCssFile = join(process.cwd(), 'src/index.css')
+const indexCssContent = readFileSync(indexCssFile, 'utf-8')
+if (/\*\s*\{\s*[^}]*(margin|padding):\s*0/i.test(indexCssContent)) {
+  VIOLATIONS.push({
+    file: indexCssFile,
+    line: 1,
+    reason: 'Unlayered wildcard reset (* { margin: 0; padding: 0; }) terdeteksi di index.css. Wajib gunakan @layer base { ... } agar tidak merusak Tailwind v4 spacing (:where).'
+  })
+}
+
+// 2a. Check for Primitive Obsession on CreditTransactionType in Superadmin Portal
 if (superadminContent.includes('type: string') && !superadminContent.includes('CreditTransactionType')) {
   VIOLATIONS.push({
     file: superadminFile,
@@ -78,7 +89,7 @@ if (superadminContent.includes('type: string') && !superadminContent.includes('C
   })
 }
 
-// 2a. Check for Spacious Layout & Anti-Dempet standard in SuperadminPortal
+// 2b. Check for Spacious Layout & Anti-Dempet standard in SuperadminPortal
 if (!superadminContent.includes('space-y-8') && !superadminContent.includes('space-y-6')) {
   VIOLATIONS.push({
     file: superadminFile,

@@ -50,6 +50,11 @@
 - **Internal / Operator Tools Zero-Exemption Rule**:
   - Dilarang memperlakukan halaman internal/developer/superadmin sebagai kanvas prototyping instan bebas aturan.
   - Halaman internal/operator wajib dibangun sebagai **Enterprise Operator Console** berstandar tinggi (mengikuti `references/app-screens.md`), dilarang menggunakan inline-style soup (`style={{ ... }}`), dilarang menggunakan emoji dekoratif pada header/tombol, dan dilarang menggunakan kartu metrik dengan angka berwarna-warni tanpa fungsi.
+  - **Single Shared Navigation Component (Zero-Duplication)**:
+    - Navigasi atas (AppNavbar) wajib diekstrak ke dalam komponen terpadu (`src/components/AppNavbar.tsx`). Dilarang keras menulis ulang atau menduplikasi blok inline style navigasi top-bar berulang kali di `src/App.tsx`.
+    - Di rute operator/superadmin (`#/superadmin`), navigasi atas wajib menampilkan indikator mode aktif (bukan tombol no-op yang mengklik tautan ke halaman dirinya sendiri) dan menyajikan hierarki single-bar yang bersih tanpa menumpuk header berulang di canvas.
+  - **CSS Layering & Specificity Integrity**:
+    - Seluruh custom CSS resets dan base element styling di `src/index.css` WAJIB dibungkus di dalam `@layer base { ... }`. DILARANG menaruh unlayered wildcard reset (`* { margin: 0; padding: 0; }`) di luar layer karena akan menimpa specificity utility class Tailwind v4 (`:where(.space-y-8 > :not(:last-child))`, `p-6`, tabel padding, dsb.) dan merusak layout menjadi gepeng/berdempet.
   - **Theme & Palette Consistency**: Seluruh halaman admin/operator WAJIB menggunakan palet tema terpadu aplikasi (Light Slate Palette: background `#F8FAFC`, panel/card `bg-white`, border `border-slate-200`, aksen teal/slate), DILARANG membuat dark terminal terisolasi kecuali jika aplikasi secara eksplisit mendukung dark mode sistematis di seluruh halaman.
   - **Spacious Layout & Anti-Dempet Standards**:
     - **Page Shell**: Halaman konsol/dashboard wajib menggunakan layout kanvas lapang (`max-w-7xl mx-auto px-6 md:px-8 py-8 md:py-10 space-y-8`), dilarang menumpuk section tanpa margin/gap vertikal lega (`space-y-8`).
@@ -81,6 +86,7 @@
 - **PowerShell Tool Economy & Safe File Manipulation**:
   - Hindari eksekusi `node -e` inline dengan string/regex literal kompleks di CLI PowerShell untuk menghindari issue escaping kutip (`SyntaxError`).
   - Selalu prioritaskan penggunaan tool native file editing (`edit_file` atau `write_file`).
+  - Hindari mencoba script headless browser ad-hoc (seperti `puppeteer`) yang tidak terdaftar di `devDependencies`; selalu prioritaskan build artifacts inspection (`dist/assets`), verifikasi linter otomatis, dan dev server preview.
 
 ## 6. Copywriting & Communication Standards (copywriting Skill)
 - Setiap update, penambahan, dan perombakan teks/konten antarmuka (Landing Page, modal onboarding, notifikasi, tombol CTA, error message, dan laporan eksekutif) **WAJIB** menerapkan prinsip dan arahan dari skill `copywriting` (`.agents/skills/copywriting`).

@@ -5,6 +5,7 @@ import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { SuperadminPortal } from './pages/SuperadminPortal'
+import { AppNavbar } from './components/AppNavbar'
 
 export type AppRoute = '#/' | '#/login' | '#/register' | '#/superadmin' | '#/workspace' | '#/dashboard' | '#/jobs'
 
@@ -175,109 +176,29 @@ export default function App() {
     }
 
     return (
-      <SuperadminPortal
-        onBackToApp={() => {
-          window.location.hash = '#/workspace'
-        }}
-      />
+      <div>
+        <AppNavbar
+          currentUser={currentUser}
+          currentRoute={route}
+          onLogout={handleLogout}
+        />
+        <SuperadminPortal
+          onBackToApp={() => {
+            window.location.hash = '#/workspace'
+          }}
+        />
+      </div>
     )
   }
 
   if (route === '#/workspace' || route === '#/dashboard' || route === '#/jobs') {
     return (
       <div>
-        {/* Workspace Top Navigation Bar */}
-        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 32px' }}>
-          <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.hash = '#/'
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: 'var(--muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: 0
-                }}
-              >
-                ← Beranda SaaS
-              </button>
-              <span style={{ height: '14px', width: '1px', background: 'var(--border)' }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>TalentHub</span>
-                <span style={{
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  background: 'var(--pill-neutral-bg)',
-                  color: 'var(--pill-neutral-ink)',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border)'
-                }}>
-                  v2.4 · Cloudflare Native
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {currentUser?.role === 'superadmin' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.hash = '#/superadmin'
-                  }}
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-control)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--positive)' }} />
-                  Portal Superadmin
-                </button>
-              )}
-
-              {currentUser && (
-                <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
-                  Halo, <strong style={{ color: 'var(--text)' }}>{currentUser.name}</strong>
-                </span>
-              )}
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                style={{
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text)',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-control)',
-                  cursor: 'pointer'
-                }}
-              >
-                Keluar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppNavbar
+          currentUser={currentUser}
+          currentRoute={route}
+          onLogout={handleLogout}
+        />
 
         {/* Talent Intelligence Workspace Content */}
         {selectedJobId === null ? (
