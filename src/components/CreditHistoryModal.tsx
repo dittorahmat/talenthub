@@ -102,7 +102,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px' }}>⚡</span>
+              <span style={{ fontSize: '20px' }}></span>
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>
                 Dompet Kredit Workspace
               </h2>
@@ -125,7 +125,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
               borderRadius: '6px',
             }}
           >
-            ✕
+            
           </button>
         </div>
 
@@ -270,7 +270,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
                       </span>
                     )}
                     <div style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', marginTop: '4px' }}>
-                      ⚡ {pkg.credits}
+                       {pkg.credits}
                     </div>
                     <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Kredit</div>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#0D9488', marginTop: '8px' }}>
@@ -331,7 +331,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
                     boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)',
                   }}
                 >
-                  {isToppingUp ? 'Memproses...' : `Konfirmasi Top Up ⚡ ${selectedTopUp} Kredit`}
+                  {isToppingUp ? 'Memproses...' : `Konfirmasi Top Up  ${selectedTopUp} Kredit`}
                 </button>
               )}
             </div>

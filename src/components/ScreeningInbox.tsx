@@ -570,7 +570,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                ⚡
+                
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Konfirmasi Batch AI Screening</h3>
@@ -601,7 +601,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
 
             {!preflightData.allowed && (
               <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
-                ⚠️ Saldo kredit Anda kurang {preflightData.shortage} kredit untuk memproses batch ini. Silakan Top Up terlebih dahulu.
+                 Saldo kredit Anda kurang {preflightData.shortage} kredit untuk memproses batch ini. Silakan Top Up terlebih dahulu.
               </div>
             )}
 

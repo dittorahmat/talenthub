@@ -18,17 +18,10 @@ function scanDirectory(dir, testFn) {
   }
 }
 
-// 1. Check for AI-slop inline styles, emojis, and isolated dark terminal theme across app views
-const filesToCheck = [
-  'src/pages/SuperadminPortal.tsx',
-  'src/App.tsx',
-  'src/pages/JobsDashboard.tsx',
-  'src/components/JobCard.tsx',
-  'src/components/TopupModal.tsx'
-]
-
-filesToCheck.forEach((relPath) => {
-  const filePath = join(process.cwd(), relPath)
+// 1. Check for AI-slop inline styles, emojis, and isolated dark terminal theme dynamically across all app components & pages
+scanDirectory(join(process.cwd(), 'src'), (filePath) => {
+  if (!filePath.endsWith('.tsx') && !filePath.endsWith('.ts')) return
+  const relPath = filePath.replace(process.cwd(), '').replace(/^[\\\/]/, '')
   const content = readFileSync(filePath, 'utf-8')
   const fileLines = content.split('\n')
   fileLines.forEach((line, idx) => {

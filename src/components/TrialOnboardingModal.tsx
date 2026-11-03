@@ -156,7 +156,7 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
             padding: '4px',
           }}
         >
-          ✕
+          
         </button>
 
         {/* Modal Header */}
