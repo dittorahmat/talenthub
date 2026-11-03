@@ -6,6 +6,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
 import { OrgEnv } from '../middleware/orgContext'
+import { BatchQueueService, BatchItemInput } from '../services/batchQueueService'
 
 const MAX_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
@@ -70,6 +71,27 @@ inboxRouter.get('/jobs/:id/inbox', async (c) => {
   })
 })
 
+inboxRouter.get('/jobs/:id/inbox/status', async (c) => {
+  const orgId = c.get('orgId') || 1
+  const jobId = parseInt(c.req.param('id'))
+  if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
+  const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
+  if (!job) return c.json({ error: 'Job not found' }, 404)
+
+  const status = await BatchQueueService.getJobBatchStatus(jobId)
+  return c.json(status)
+})
+
+inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
+  const orgId = c.get('orgId') || 1
+  const jobId = parseInt(c.req.param('id'))
+  if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
+  const count = parseInt(c.req.query('count') || '1')
+
+  const preflight = await BatchQueueService.checkPreFlightBalance(orgId, Math.max(1, count))
+  return c.json(preflight)
+})
+
 inboxRouter.post('/jobs/:id/inbox', async (c) => {
   const orgId = c.get('orgId') || 1
   const jobId = parseInt(c.req.param('id'))
@@ -97,165 +119,52 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
 
   if (files.length === 0) return c.json({ error: 'No files provided' }, 400)
 
-  const created: any[] = []
-
-  for (const file of files) {
-    const ext = file.name.split('.').pop()?.toLowerCase() || ''
-    if (!(ALLOWED_EXTS as readonly string[]).includes(ext as any)) {
-      continue
-    }
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    if (buffer.length > MAX_BYTES) {
-      continue
-    }
-
-    let extractedText = ''
-    try {
-      extractedText = buffer.toString('utf-8')
-    } catch {
-      extractedText = ''
-    }
-
-    const emailMatch = extractedText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
-    const phoneMatch = extractedText.match(/(?:\+62|62|08)[0-9\s-]{8,14}/)
-    const extractedEmail = emailMatch ? emailMatch[0] : null
-    const extractedPhone = phoneMatch ? phoneMatch[0].trim() : null
-    const sanitizedName = sanitizeName(file.name)
-
-    let isDuplicate = false
-    let duplicateOf: number | null = null
-
-    if (extractedEmail) {
-      const normalizedEmail = extractedEmail.toLowerCase()
-      const allApps = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
-      const found = allApps.find((a: any) => a.email && a.email.toLowerCase() === normalizedEmail)
-      if (found) {
-        isDuplicate = true
-        duplicateOf = (found as any).id
-      }
-    }
-    if (!isDuplicate && extractedPhone) {
-      const normalizedPhone = extractedPhone.replace(/\s|-/g, '')
-      const allApps2 = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
-      const foundPhone = allApps2.find((a: any) => a.phone && a.phone.replace(/\s|-/g, '') === normalizedPhone)
-      if (foundPhone) { isDuplicate = true; duplicateOf = (foundPhone as any).id }
-    }
-    if (!isDuplicate) {
-      const existingInbox = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
-      const dupInbox = existingInbox.find((i: any) => i.filename === file.name)
-      if (dupInbox) { isDuplicate = true; duplicateOf = (dupInbox as any).id }
-    }
-    if (!isDuplicate) {
-      const allApps3 = await db.select().from(applicants).where(and(eq(applicants.jobId, jobId), eq(applicants.organizationId, orgId))).all()
-      const foundFilename = allApps3.find((a: any) => a.resumeFilename === file.name)
-      if (foundFilename) { isDuplicate = true; duplicateOf = (foundFilename as any).id }
-    }
-
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'inbox')
-    await fs.mkdir(uploadDir, { recursive: true })
-    const storedFilename = `${jobId}-${Date.now()}-${Math.abs(hashInt(buffer.length + file.name.length))}.${ext}`
-    const filePath = path.join(uploadDir, storedFilename)
-    await fs.writeFile(filePath, buffer)
-    const fileUrl = `/uploads/inbox/${storedFilename}`
-
-    const keywordsArr = extractKeywords(extractedText)
-    const keywordsStr = keywordsArr.join(', ') || null
-
-    if (isDuplicate) {
-      const now = new Date().toISOString()
-      const inserted = await db.insert(inboxItems).values({
-        jobId,
-        filename: file.name,
-        filePath,
-        fileUrl,
-        status: 'ready',
-        name: sanitizedName,
-        email: extractedEmail,
-        phone: extractedPhone,
-        keywords: keywordsStr,
-        score: null,
-        band: 'Weak',
-        verdict: 'Pass',
-        rationale: `${sanitizedName} sudah melamar pada lowongan ini.`,
-        knockoutResult: null,
-        duplicateOf,
-        promotedApplicantId: null,
-        createdAt: now,
-      }).returning().get()
-      created.push(mapInboxRow(inserted))
-      continue
-    }
-
-    const now = new Date().toISOString()
-    const inserted = await db.insert(inboxItems).values({
-      jobId,
-      filename: file.name,
-      filePath,
-      fileUrl,
-      status: 'queued',
-      name: sanitizedName,
-      email: extractedEmail,
-      phone: extractedPhone,
-      keywords: keywordsStr,
-      score: null,
-      band: null,
-      verdict: null,
-      rationale: null,
-      knockoutResult: null,
-      duplicateOf: null,
-      promotedApplicantId: null,
-      createdAt: now,
-    }).returning().get()
-
-    const itemId = (inserted as any).id
-
-    setTimeout(async () => {
-      try {
-        await db.update(inboxItems).set({ status: 'parsing' }).where(eq(inboxItems.id, itemId)).run()
-      } catch {}
-      const hashDelay = 2000 + (Math.abs(hashInt(itemId * 1337 + buffer.length)) % 2001)
-      setTimeout(async () => {
-        try {
-          const fresh = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
-          if (!fresh || fresh.status === 'dismissed' || fresh.status === 'promoted') return
-          const jobRow = await db.select().from(jobs).where(eq(jobs.id, fresh.jobId)).get() as any
-          const jobTitle = jobRow?.title ?? 'Senior Frontend Engineer'
-          const kwStr = fresh.keywords ?? ''
-          const result = mockScreening({ id: fresh.id, name: fresh.name ?? sanitizedName, resumeKeywords: kwStr }, { title: jobTitle })
-          let band = result.band
-          let verdict = verdictFor(band)
-          const knockouts = await db.select().from(jobKnockouts).where(eq(jobKnockouts.jobId, fresh.jobId)).all() as any[]
-          let knockoutFailed: string | null = null
-          for (const k of knockouts) {
-            const h = Math.abs(hashInt(fresh.id * 1009 + k.id * 97))
-            if (h % 3 === 0) { knockoutFailed = k.question; break }
-          }
-          if (knockoutFailed && verdict === 'Hire') verdict = 'Consider'
-          const rationale = rationaleFor({
-            name: fresh.name ?? sanitizedName,
-            verdict,
-            matched: result.matched,
-            missing: result.missing,
-            knockoutFailed,
-          })
-          await db.update(inboxItems).set({
-            status: 'ready',
-            score: result.score,
-            band,
-            verdict,
-            rationale,
-            knockoutResult: knockoutFailed,
-            keywords: result.matched.join(', ') ? result.matched.join(', ') : kwStr,
-          }).where(eq(inboxItems.id, itemId)).run()
-        } catch {}
-      }, hashDelay)
-    }, 1000)
-
-    created.push(mapInboxRow(inserted))
+  // Pre-flight check balance for batch
+  const preflight = await BatchQueueService.checkPreFlightBalance(orgId, files.length)
+  if (!preflight.allowed) {
+    return c.json({
+      error: 'INSUFFICIENT_CREDIT',
+      message: `Saldo kredit tidak mencukupi untuk memproses ${files.length} berkas CV. Dibutuhkan ${preflight.required} kredit, saldo Anda ${preflight.current} kredit.`,
+      required: preflight.required,
+      current: preflight.current,
+      shortage: preflight.shortage,
+    }, 402)
   }
 
-  return c.json({ items: created })
+  // Convert files to buffer items for BatchQueueService
+  const batchInputs: BatchItemInput[] = []
+  for (const file of files) {
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    if (!(ALLOWED_EXTS as readonly string[]).includes(ext as any)) continue
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+    if (buffer.length > MAX_BYTES) continue
+    batchInputs.push({
+      filename: file.name,
+      buffer,
+    })
+  }
+
+  if (batchInputs.length === 0) {
+    return c.json({ error: 'No valid files provided' }, 400)
+  }
+
+  const batchResult = await BatchQueueService.enqueueBatch({
+    orgId,
+    jobId,
+    files: batchInputs,
+    autoProcessAsync: true,
+  })
+
+  // Also query fresh inbox items so caller receives immediate list
+  const freshItems = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
+
+  return c.json({
+    message: `Batch ${batchResult.queuedCount} berkas CV berhasil masuk antrean.`,
+    batchId: batchResult.batchId,
+    reservedCredits: batchResult.reservedCredits,
+    items: freshItems.map(mapInboxRow),
+  }, 201)
 })
 
 inboxRouter.post('/inbox/:itemId/promote', async (c) => {

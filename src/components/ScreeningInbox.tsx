@@ -150,24 +150,52 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     }
   }, [items, fetchInbox])
 
+  // pre-flight confirmation modal state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [preflightData, setPreflightData] = useState<{ required: number; current: number; shortage: number; allowed: boolean } | null>(null)
+  const [showPreflightModal, setShowPreflightModal] = useState(false)
+
   const handleFiles = async (files: FileList | File[]) => {
     const arr = Array.from(files)
     if (arr.length === 0) return
     setUploadError(null)
+
+    // Pre-flight check via API before accepting
+    try {
+      const pfRes = await orgFetch(`/api/jobs/${jobId}/inbox/preflight?count=${arr.length}`)
+      if (pfRes.ok) {
+        const pf = await pfRes.json()
+        setPendingFiles(arr)
+        setPreflightData(pf)
+        setShowPreflightModal(true)
+        return
+      }
+    } catch {}
+
+    // Fallback direct execution if preflight check unavailable
+    executeBatchUpload(arr)
+  }
+
+  const executeBatchUpload = async (arr: File[]) => {
+    setShowPreflightModal(false)
     setUploading(true)
     try {
       const fd = new FormData()
       arr.forEach(f => fd.append('files', f))
-      // also try 'cvs' fallback if backend expects that
-      // primary is 'files'
       const res = await orgFetch(`/api/jobs/${jobId}/inbox`, {
         method: 'POST',
         body: fd
       })
       if (!res.ok) {
-        const txt = await res.text().catch(() => '')
-        throw new Error(txt || `Upload gagal (${res.status})`)
+        let errorMsg = `Upload gagal (${res.status})`
+        try {
+          const json = await res.json()
+          if (json.message) errorMsg = json.message
+        } catch {}
+        throw new Error(errorMsg)
       }
+      // trigger balance update
+      window.dispatchEvent(new Event('walletChanged'))
       await fetchInbox()
       pollCountRef.current = 0
     } catch (e: any) {
@@ -175,6 +203,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      setPendingFiles([])
     }
   }
 
@@ -516,6 +545,99 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
           </div>
         )}
       </div>
+
+      {/* Pre-flight Credit Confirmation Modal */}
+      {showPreflightModal && preflightData && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #E2E8F0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                ⚡
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Konfirmasi Batch AI Screening</h3>
+                <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748B' }}>Pemotongan kredit untuk {pendingFiles.length} berkas CV</p>
+              </div>
+            </div>
+
+            <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0', marginBottom: '20px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Jumlah CV diunggah:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{pendingFiles.length} berkas</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Kredit dibutuhkan:</span>
+                <span style={{ fontWeight: 700, color: '#D97706' }}>{preflightData.required} Kredit</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748B' }}>Saldo kredit saat ini:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{preflightData.current} Kredit</span>
+              </div>
+              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '8px', marginTop: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#64748B' }}>Sisa saldo setelah proses:</span>
+                <span style={{ fontWeight: 700, color: preflightData.allowed ? '#16A34A' : '#DC2626' }}>
+                  {preflightData.allowed ? `${preflightData.current - preflightData.required} Kredit` : 'Kredit Tidak Cukup'}
+                </span>
+              </div>
+            </div>
+
+            {!preflightData.allowed && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
+                ⚠️ Saldo kredit Anda kurang {preflightData.shortage} kredit untuk memproses batch ini. Silakan Top Up terlebih dahulu.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => { setShowPreflightModal(false); setPendingFiles([]); }}
+                style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: 'white', color: '#475569', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+              >
+                Batal
+              </button>
+              {preflightData.allowed ? (
+                <button
+                  type="button"
+                  onClick={() => executeBatchUpload(pendingFiles)}
+                  style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#0D9488', color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Lanjutkan & Proses AI
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPreflightModal(false);
+                    setPendingFiles([]);
+                    window.dispatchEvent(new CustomEvent('openTopupModal'));
+                  }}
+                  style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#D97706', color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  + Top Up Saldo
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
