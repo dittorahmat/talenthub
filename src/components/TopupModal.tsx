@@ -210,9 +210,9 @@ export const TopupModal: React.FC<TopupModalProps> = ({
             type="button"
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.1)',
+              background: 'transparent',
               border: 'none',
-              color: '#CBD5E1',
+              color: 'var(--muted)',
               borderRadius: '8px',
               width: '32px',
               height: '32px',
@@ -220,10 +220,13 @@ export const TopupModal: React.FC<TopupModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              fontSize: '16px',
             }}
+            aria-label="Tutup modal"
           >
-            ✕
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
 
@@ -269,7 +272,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
               >
                 <div style={{ fontSize: '12px', color: '#64748B' }}>Saldo Dompet Baru:</div>
                 <div style={{ fontSize: '28px', fontWeight: 800, color: '#0D9488', marginTop: '4px' }}>
-                  ⚡ {successInfo.newBalance} Kredit
+                  {successInfo.newBalance} Kredit
                 </div>
               </div>
 
@@ -462,7 +465,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
                     boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
                   }}
                 >
-                  {simulating ? 'Menyelesaikan...' : '⚡ Simulasi Bayar Instan'}
+                  {simulating ? 'Menyelesaikan...' : 'Simulasi Bayar Instan'}
                 </button>
               </div>
 
@@ -549,7 +552,7 @@ export const TopupModal: React.FC<TopupModalProps> = ({
 
                       <div style={{ fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>{pkg.name}</div>
                       <div style={{ marginTop: '8px' }}>
-                        <span style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>⚡ {pkg.credits}</span>
+                        <span style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>{pkg.credits}</span>
                         <span style={{ fontSize: '12px', color: '#64748B', marginLeft: '4px' }}>Kredit</span>
                       </div>
 
@@ -579,9 +582,9 @@ export const TopupModal: React.FC<TopupModalProps> = ({
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                   {[
-                    { id: 'qris', label: 'QRIS', icon: '📱', desc: 'Instan semua e-wallet' },
-                    { id: 'va_bca', label: 'BCA Virtual Account', icon: '🏦', desc: 'BCA Mobile / KlikBCA' },
-                    { id: 'va_mandiri', label: 'Mandiri Virtual Account', icon: '🏛️', desc: 'Livin by Mandiri' },
+                    { id: 'qris', label: 'QRIS', icon: '', desc: 'Instan semua e-wallet' },
+                    { id: 'va_bca', label: 'BCA Virtual Account', icon: '', desc: 'BCA Mobile / KlikBCA' },
+                    { id: 'va_mandiri', label: 'Mandiri Virtual Account', icon: '', desc: 'Livin by Mandiri' },
                   ].map((m) => {
                     const isSelected = paymentMethod === m.id
                     return (

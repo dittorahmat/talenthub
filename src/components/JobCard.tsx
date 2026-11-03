@@ -92,13 +92,19 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
             background: 'none',
             border: 'none',
             color: 'var(--muted)',
-            fontSize: '14px',
             padding: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
-          title="Delete requisition"
+          aria-label="Hapus lowongan"
+          title="Hapus lowongan"
         >
-          ✕
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
 
@@ -114,9 +120,9 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
           <span className="tabular-numbers" style={{ fontWeight: 700, color: 'var(--text)' }}>
             {job.applicantCount}
           </span>
-          <span style={{ color: 'var(--muted)' }}>applicants</span>
+          <span style={{ color: 'var(--muted)' }}>pelamar</span>
           <span style={{ color: 'var(--border)' }}>·</span>
-          <span style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+          <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
             {timeAgo(job.posted_at)}
           </span>
         </div>
@@ -139,7 +145,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onDelete, onOpe
               cursor: 'pointer'
             }}
           >
-            AI Screening Inbox →
+            Kotak Masuk Skrining →
           </button>
         )}
       </div>

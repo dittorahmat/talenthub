@@ -438,7 +438,7 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
                       </td>
                       <td
                         className={`py-3.5 px-5 text-right font-mono tabular-nums font-bold ${
-                          log.amount > 0 ? 'text-emerald-700' : log.amount < 0 ? 'text-rose-700' : 'text-slate-500'
+                          log.amount > 0 ? 'text-teal-700' : log.amount < 0 ? 'text-rose-700' : 'text-slate-500'
                         }`}
                       >
                         {log.amount > 0 ? `+${log.amount}` : log.amount}
