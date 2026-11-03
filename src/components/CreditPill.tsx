@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { orgFetch, useOrg } from '../context/OrgContext'
 import { CreditHistoryModal, CreditTransaction } from './CreditHistoryModal'
+import { TopupModal } from './TopupModal'
 
 export const CreditPill: React.FC = () => {
   const { currentOrg } = useOrg()
@@ -8,6 +9,7 @@ export const CreditPill: React.FC = () => {
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
+  const [isTopupModalOpen, setIsTopupModalOpen] = useState<boolean>(false)
   const [isToppingUp, setIsToppingUp] = useState<boolean>(false)
 
   const fetchWallet = async () => {
@@ -105,7 +107,7 @@ export const CreditPill: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setIsTopupModalOpen(true)}
           style={{
             background: isLowBalance ? '#DC2626' : '#0D9488',
             color: 'white',
@@ -117,7 +119,7 @@ export const CreditPill: React.FC = () => {
             cursor: 'pointer',
             lineHeight: '1.2',
           }}
-          title="Top up kredit"
+          title="Beli paket kredit"
         >
           + Top Up
         </button>
@@ -129,7 +131,18 @@ export const CreditPill: React.FC = () => {
         balance={balance ?? 0}
         transactions={transactions}
         onTopUp={handleTopUp}
+        onOpenTopupModal={() => setIsTopupModalOpen(true)}
         isToppingUp={isToppingUp}
+      />
+
+      <TopupModal
+        isOpen={isTopupModalOpen}
+        onClose={() => setIsTopupModalOpen(false)}
+        currentBalance={balance ?? 0}
+        onPaymentSuccess={async (newBal) => {
+          setBalance(newBal)
+          await fetchWallet()
+        }}
       />
     </>
   )

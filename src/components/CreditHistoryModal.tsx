@@ -15,6 +15,7 @@ interface CreditHistoryModalProps {
   balance: number
   transactions: CreditTransaction[]
   onTopUp: (amount: number) => Promise<void>
+  onOpenTopupModal?: () => void
   isToppingUp?: boolean
 }
 
@@ -24,6 +25,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
   balance,
   transactions,
   onTopUp,
+  onOpenTopupModal,
   isToppingUp = false,
 }) => {
   const [selectedTopUp, setSelectedTopUp] = useState<number>(100)
@@ -225,13 +227,19 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
                 {[
-                  { credits: 50, price: 'Rp 50.000', popular: false },
-                  { credits: 100, price: 'Rp 90.000', popular: true },
-                  { credits: 500, price: 'Rp 400.000', popular: false },
+                  { id: 'starter', credits: 100, price: 'Rp 250.000', popular: false },
+                  { id: 'growth', credits: 500, price: 'Rp 1.000.000', popular: true },
+                  { id: 'enterprise', credits: 2500, price: 'Rp 3.750.000', popular: false },
                 ].map((pkg) => (
                   <div
                     key={pkg.credits}
-                    onClick={() => setSelectedTopUp(pkg.credits)}
+                    onClick={() => {
+                      setSelectedTopUp(pkg.credits)
+                      if (onOpenTopupModal) {
+                        onClose()
+                        onOpenTopupModal()
+                      }
+                    }}
                     style={{
                       border: selectedTopUp === pkg.credits ? '2px solid #0D9488' : '1px solid #E2E8F0',
                       background: selectedTopUp === pkg.credits ? '#F0FDFA' : 'white',
@@ -258,7 +266,7 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
                           textTransform: 'uppercase',
                         }}
                       >
-                        Paling Hemat
+                        Paling Populer
                       </span>
                     )}
                     <div style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', marginTop: '4px' }}>
@@ -272,32 +280,60 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
                 ))}
               </div>
 
-              <button
-                type="button"
-                disabled={isToppingUp}
-                onClick={async () => {
-                  await onTopUp(selectedTopUp)
-                  setActiveTab('history')
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: isToppingUp ? '#94A3B8' : '#0D9488',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: isToppingUp ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)',
-                }}
-              >
-                {isToppingUp ? 'Memproses...' : `Konfirmasi Top Up ⚡ ${selectedTopUp} Kredit`}
-              </button>
+              {onOpenTopupModal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose()
+                    onOpenTopupModal()
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#0D9488',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)',
+                  }}
+                >
+                  💳 Buka Kasir Pembayaran (QRIS / VA) →
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isToppingUp}
+                  onClick={async () => {
+                    await onTopUp(selectedTopUp)
+                    setActiveTab('history')
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: isToppingUp ? '#94A3B8' : '#0D9488',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: isToppingUp ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 4px rgba(13, 148, 136, 0.2)',
+                  }}
+                >
+                  {isToppingUp ? 'Memproses...' : `Konfirmasi Top Up ⚡ ${selectedTopUp} Kredit`}
+                </button>
+              )}
             </div>
           )}
         </div>
