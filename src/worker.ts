@@ -11,6 +11,8 @@ import { organizationsRouter } from './api/organizations'
 import { walletRouter } from './api/wallet'
 import { onboardingRouter } from './api/onboarding'
 import { billingRouter } from './api/billing'
+import { authRouter } from './api/auth'
+import { superadminRouter } from './api/superadmin'
 
 export interface Env {
   DB: D1Database
@@ -30,6 +32,8 @@ app.get('/api/health', (c) => c.json({
   timestamp: new Date().toISOString()
 }))
 
+app.route('/api/auth', authRouter)
+app.route('/api/superadmin', superadminRouter)
 app.route('/api/organizations', organizationsRouter)
 app.route('/api/wallet', walletRouter)
 app.route('/api/onboarding', onboardingRouter)

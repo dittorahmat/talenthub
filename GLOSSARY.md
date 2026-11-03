@@ -6,7 +6,16 @@
 Perusahaan atau entitas bisnis yang berlangganan SaaS. Merupakan batas isolasi data (*multi-tenant boundary*). Semua data pekerjaan, pelamar, dan dompet kredit terikat pada satu Organization.
 
 ### User
-Pengguna yang memiliki kredensial login (email/password atau SSO) dan merupakan anggota dari Organization dengan peran tertentu (Owner, Admin, Recruiter, Viewer).
+Pengguna yang memiliki kredensial login (dikelola oleh Better Auth) dan merupakan anggota dari Organization dengan peran tertentu (Owner, Admin, Recruiter, Viewer).
+
+### Superadmin
+Peran istimewa lintas-tenant (platform operator) yang memiliki akses ke `/superadmin` untuk keperluan pengujian, pemantauan tenant, audit antrean CV, dan manual instant credit adjustment pada dompet organisasi mana pun tanpa payment gateway.
+
+### SaaS Landing Page
+Halaman depan publik (`/`) yang fokus mengomunikasikan value proposition Talent Intelligence (AI Screening, ATS Kanban, Scoring Kecocokan), tier harga kredit, dan CTA menuju pendaftaran `/register` serta `/login`.
+
+### Better Auth Integration
+Engine autentikasi terpusat yang menangani session cookies, manajemen akun, hash password, dan verifikasi email/domain pada database Cloudflare D1/SQLite.
 
 ### Credit Wallet
 Dompet saldo non-tunai milik Organization yang menyimpan unit kredit prabayar untuk mengonsumsi layanan AI.

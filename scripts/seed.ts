@@ -1,8 +1,12 @@
 import { db, sqlite } from '../src/db'
-import { organizations, jobs, applicants, notes, activities, inboxItems, jobKnockouts, creditWallets, creditTransactions } from '../src/db/schema'
+import { organizations, jobs, applicants, notes, activities, inboxItems, jobKnockouts, creditWallets, creditTransactions, user, account } from '../src/db/schema'
 import { mockScreening } from '../src/api/screening'
 import { eq } from 'drizzle-orm'
 
+sqlite.exec('DELETE FROM verification;')
+sqlite.exec('DELETE FROM account;')
+sqlite.exec('DELETE FROM session;')
+sqlite.exec('DELETE FROM user;')
 sqlite.exec('DELETE FROM credit_transactions;')
 sqlite.exec('DELETE FROM credit_wallets;')
 sqlite.exec('DELETE FROM inbox_items;')
@@ -15,6 +19,7 @@ sqlite.exec('DELETE FROM organizations;')
 sqlite.exec('DELETE FROM sqlite_sequence;')
 
 const now = new Date().toISOString()
+const nowTs = new Date()
 
 // 1. Seed organizations
 const insertedOrgs = db.insert(organizations).values([
@@ -33,6 +38,52 @@ const insertedOrgs = db.insert(organizations).values([
 const org1 = insertedOrgs[0]
 const org2 = insertedOrgs[1]
 const defaultOrgId = org1.id // id 1 ("tech-satu-solusi")
+
+// Seed Default Users (Superadmin & Demo Recruiter)
+const superadminUserId = 'usr_superadmin_01'
+db.insert(user).values({
+  id: superadminUserId,
+  name: 'Super Admin TalentHub',
+  email: 'superadmin@talenthub.ai',
+  emailVerified: true,
+  role: 'superadmin',
+  organizationId: org1.id,
+  createdAt: nowTs,
+  updatedAt: nowTs,
+}).run()
+
+db.insert(account).values({
+  id: 'acc_superadmin_01',
+  accountId: 'superadmin@talenthub.ai',
+  providerId: 'credential',
+  userId: superadminUserId,
+  password: 'hashed_Admin123!@#', // Development test hash/password
+  createdAt: nowTs,
+  updatedAt: nowTs,
+}).run()
+
+const demoUserId = 'usr_recruiter_01'
+db.insert(user).values({
+  id: demoUserId,
+  name: 'Demo HR Lead',
+  email: 'recruiter@tech1solusi.com',
+  emailVerified: true,
+  role: 'admin',
+  organizationId: org1.id,
+  createdAt: nowTs,
+  updatedAt: nowTs,
+}).run()
+
+db.insert(account).values({
+  id: 'acc_recruiter_01',
+  accountId: 'recruiter@tech1solusi.com',
+  providerId: 'credential',
+  userId: demoUserId,
+  password: 'hashed_Demo123!@#',
+  createdAt: nowTs,
+  updatedAt: nowTs,
+}).run()
+
 
 // Seed Wallets & Transactions
 const wallet1 = db.insert(creditWallets).values({

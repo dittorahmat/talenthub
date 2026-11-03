@@ -100,15 +100,15 @@ Fullstack Engineer
     const finalBalance = (await getWallet(orgId)).balance
     expect(finalBalance).toBe(initialBalance - 1)
 
-    // Verify ledger has both RESERVED and CV_SCREENING
+    // Verify ledger has both RESERVED and SETTLED
     const txs = await db.select().from(creditTransactions)
       .where(eq(creditTransactions.organizationId, orgId))
       .all()
 
     const hasReserved = txs.some(t => t.type === 'RESERVED' && t.description?.includes(candidate.name))
-    const hasScreening = txs.some(t => t.type === 'CV_SCREENING' && t.description?.includes(candidate.name))
+    const hasSettled = txs.some(t => t.type === 'SETTLED' && t.description?.includes(candidate.name))
     expect(hasReserved).toBe(true)
-    expect(hasScreening).toBe(true)
+    expect(hasSettled).toBe(true)
   })
 
   it('verifies corrupted / unreadable file triggers automatic refund of 1 credit and marks status error', async () => {

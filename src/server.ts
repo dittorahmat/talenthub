@@ -12,6 +12,8 @@ import { organizationsRouter } from './api/organizations'
 import { walletRouter } from './api/wallet'
 import { onboardingRouter } from './api/onboarding'
 import { billingRouter } from './api/billing'
+import { authRouter } from './api/auth'
+import { superadminRouter } from './api/superadmin'
 
 const app = new Hono()
 
@@ -20,6 +22,8 @@ app.use('/api/*', orgMiddleware)
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
+app.route('/api/auth', authRouter)
+app.route('/api/superadmin', superadminRouter)
 app.route('/api/organizations', organizationsRouter)
 app.route('/api/wallet', walletRouter)
 app.route('/api/onboarding', onboardingRouter)
