@@ -5,8 +5,8 @@ Kemudahan kolaborasi antara recruiter dan hiring manager non-HR. Recruiter dapat
 
 **Blocked by:** 03: Single CV Real AI Screening and Deduction
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Template visual "1-Page Candidate Intelligence Summary" yang ringkas, profesional, dan branded.
-- [ ] Tombol "Ekspor Ringkasan AI" di modal detail kandidat yang memicu download PDF atau copy formatted share text untuk WhatsApp.
-- [ ] Endpoint yang menyajikan format dokumen ringkasan kandidat yang siap cetak / simpan.
+- [x] Template visual "1-Page Candidate Intelligence Summary" yang ringkas, profesional, dan branded.
+- [x] Tombol "Ekspor Ringkasan AI" di modal detail kandidat yang memicu download PDF atau copy formatted share text untuk WhatsApp.
+- [x] Endpoint yang menyajikan format dokumen ringkasan kandidat yang siap cetak / simpan.

@@ -3,6 +3,7 @@ import { db } from '../db'
 import { jobs, applicants, notes, activities } from '../db/schema'
 import { eq, desc, and } from 'drizzle-orm'
 import { OrgEnv } from '../middleware/orgContext'
+import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
 
 export const applicantsRouter = new Hono<OrgEnv>()
 
@@ -38,6 +39,65 @@ applicantsRouter.get('/:id/screening', async (c) => {
       matched: (applicant as any).screeningMatched ? (applicant as any).screeningMatched.split(', ').filter(Boolean) : [],
       missing: (applicant as any).screeningMissing ? (applicant as any).screeningMissing.split(', ').filter(Boolean) : [],
       expYears: (applicant as any).screeningExpYears,
+      interviewQuestions: generateInterviewQuestions(
+        (applicant as any).screeningMissing ? (applicant as any).screeningMissing.split(', ').filter(Boolean) : []
+      ),
+    })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+applicantsRouter.get('/:id/summary', async (c) => {
+  try {
+    const orgId = c.get('orgId') || 1
+    const id = parseInt(c.req.param('id'))
+    if (isNaN(id)) return c.notFound()
+
+    const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+    if (!applicant) return c.notFound()
+
+    const job = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+    const a = applicant as any
+
+    const matchedSkills = a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : []
+    const missingSkills = a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : []
+    const roleTitle = job?.title || 'Posisi Terkait'
+    const questions = generateInterviewQuestions(missingSkills, roleTitle)
+    const formattedDate = applicant.createdAt ? new Date(applicant.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Hari ini'
+
+    const whatsappShareText = formatWhatsAppSummary({
+      candidateName: applicant.name,
+      appliedRole: roleTitle,
+      appliedDate: formattedDate,
+      score: a.screeningScore,
+      verdict: a.screeningVerdict,
+      summary: a.screeningSummary,
+      matchedSkills,
+      missingSkills,
+      expYears: a.screeningExpYears,
+      interviewQuestions: questions
+    })
+
+    return c.json({
+      candidate_id: applicant.id,
+      candidate_name: applicant.name,
+      candidate_email: applicant.email,
+      candidate_phone: applicant.phone,
+      applied_role: roleTitle,
+      applied_date: applicant.createdAt,
+      applied_date_formatted: formattedDate,
+      status: applicant.status,
+      screening_status: a.screeningStatus ?? 'pending',
+      screening_score: a.screeningScore ?? null,
+      screening_band: a.screeningBand ?? null,
+      screening_verdict: a.screeningVerdict ?? null,
+      screening_summary: a.screeningSummary ?? null,
+      matched_skills: matchedSkills,
+      missing_skills: missingSkills,
+      screening_exp_years: a.screeningExpYears ?? null,
+      interview_questions: questions,
+      whatsapp_share_text: whatsappShareText
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
@@ -80,9 +140,44 @@ applicantsRouter.get('/:id', async (c) => {
       screening_matched: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
       screening_missing: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
       screening_exp_years: a.screeningExpYears ?? null,
+      interview_questions: generateInterviewQuestions(
+        a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+        job?.title || 'posisi yang dilamar'
+      ),
       job: job ? { id: job.id, organization_id: job.organizationId, title: job.title, location: job.location, remote: job.remote } : null,
       notes: appNotes.map(n => ({ id: n.id, applicantId: n.applicantId, text: n.text, author: n.author, created_at: n.createdAt })),
-      activities: appActivities.map(act => ({ id: act.id, applicantId: act.applicantId, type: act.type, description: act.description, user: act.user, timestamp: act.timestamp }))
+      activities: appActivities.map(act => ({ id: act.id, applicantId: act.applicantId, type: act.type, description: act.description, user: act.user, timestamp: act.timestamp })),
+      summary_export: {
+        candidate_name: applicant.name,
+        applied_role: job?.title || 'Unknown Role',
+        applied_date: applicant.createdAt,
+        score: a.screeningScore ?? null,
+        band: a.screeningBand ?? null,
+        verdict: a.screeningVerdict ?? null,
+        summary: a.screeningSummary ?? null,
+        matched_skills: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
+        missing_skills: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+        exp_years: a.screeningExpYears ?? null,
+        interview_questions: generateInterviewQuestions(
+          a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+          job?.title || 'posisi yang dilamar'
+        ),
+        whatsapp_share_text: formatWhatsAppSummary({
+          candidateName: applicant.name,
+          appliedRole: job?.title || 'Posisi Terkait',
+          appliedDate: applicant.createdAt ? new Date(applicant.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Hari ini',
+          score: a.screeningScore,
+          verdict: a.screeningVerdict,
+          summary: a.screeningSummary,
+          matchedSkills: a.screeningMatched ? a.screeningMatched.split(', ').filter(Boolean) : [],
+          missingSkills: a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+          expYears: a.screeningExpYears,
+          interviewQuestions: generateInterviewQuestions(
+            a.screeningMissing ? a.screeningMissing.split(', ').filter(Boolean) : [],
+            job?.title || 'posisi yang dilamar'
+          )
+        })
+      }
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
