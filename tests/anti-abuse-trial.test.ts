@@ -4,6 +4,7 @@ import { db } from '../src/db'
 import { trialClaims, organizations, creditWallets, creditTransactions } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
 import { isPublicOrDisposableEmail, extractDomain } from '../src/services/antiAbuseService'
+import { sessionHeadersFor } from './helpers/auth'
 
 describe('Anti-Abuse Free Trial Onboarding Tests', () => {
   const baseUrl = 'http://localhost:3001'
@@ -124,7 +125,7 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
     // 4. Verify wallet balance via GET /api/wallet
     const walletRes = await server.fetch(
       new Request(`${baseUrl}/api/wallet`, {
-        headers: { 'x-organization-id': orgId.toString() },
+        headers: await sessionHeadersFor(orgId),
       })
     )
     expect(walletRes.status).toBe(200)

@@ -11,6 +11,45 @@ export const authRouter = new Hono()
 // Better Auth standard session token cookie name
 export const SESSION_COOKIE_NAME = 'better-auth.session_token'
 
+const GENERIC_AUTH_ERROR = 'Email atau kata sandi tidak valid.'
+
+const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
+const AUTH_MAX_ATTEMPTS = 10
+const authAttempts = new Map<string, { count: number; resetAt: number }>()
+
+function authAttemptKey(ipAddress: string, email: string): string {
+  return `${ipAddress}|${email.trim().toLowerCase()}`
+}
+
+/**
+ * Records a failed sign-in and reports whether the caller has exceeded the
+ * allowance. The map is pruned opportunistically so a long-lived instance
+ * cannot grow without bound.
+ */
+function registerFailedAttempt(key: string): boolean {
+  const now = Date.now()
+  const existing = authAttempts.get(key)
+  if (!existing || existing.resetAt <= now) {
+    authAttempts.set(key, { count: 1, resetAt: now + AUTH_ATTEMPT_WINDOW_MS })
+  } else {
+    existing.count += 1
+  }
+  if (authAttempts.size > 5000) {
+    for (const [entryKey, entry] of authAttempts) {
+      if (entry.resetAt <= now) authAttempts.delete(entryKey)
+    }
+  }
+  const entry = authAttempts.get(key)
+  return Boolean(entry && entry.count > AUTH_MAX_ATTEMPTS)
+}
+
+let dummyPasswordHash: Promise<string> | null = null
+
+function getDummyPasswordHash(): Promise<string> {
+  dummyPasswordHash ??= hashPassword('talenthub-timing-equalisation-dummy')
+  return dummyPasswordHash
+}
+
 export interface SerializedUser {
   id: string
   name: string
@@ -99,25 +138,31 @@ authRouter.post('/sign-in/email', async (c) => {
 
     const userList = await db.select().from(user).where(eq(user.email, email.toLowerCase().trim()))
     const existingUser = userList[0]
-    if (!existingUser) {
-      return c.json({ error: 'Kredensial tidak valid. Silakan periksa kembali email Anda.' }, 401)
-    }
 
-    const accountList = await db.select().from(account).where(eq(account.userId, existingUser.id))
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('x-forwarded-for') || '127.0.0.1'
+    const attemptKey = authAttemptKey(ipAddress, email)
+
+    const accountList = existingUser
+      ? await db.select().from(account).where(eq(account.userId, existingUser.id))
+      : []
     const userAcc = accountList[0]
-    if (!userAcc || !userAcc.password) {
-      return c.json({ error: 'Akun ini belum memiliki kata sandi terkonfigurasi.' }, 401)
-    }
 
-    // Verify using standard Better Auth cryptographic scrypt/PBKDF2 hash verification
+    // Always run one hash comparison so response time does not reveal whether
+    // the account exists or has a password configured.
+    const hashToVerify = userAcc?.password ?? (await getDummyPasswordHash())
     const isValid = await verifyPassword({
       password,
-      hash: userAcc.password,
+      hash: hashToVerify,
     })
 
-    if (!isValid) {
-      return c.json({ error: 'Password tidak sesuai' }, 401)
+    if (!existingUser || !userAcc?.password || !isValid) {
+      if (registerFailedAttempt(attemptKey)) {
+        return c.json({ error: 'Terlalu banyak percobaan masuk. Coba lagi dalam beberapa menit.' }, 429)
+      }
+      return c.json({ error: GENERIC_AUTH_ERROR }, 401)
     }
+
+    authAttempts.delete(attemptKey)
 
     // Generate secure session token
     const token = 'ba_' + randomUUID().replace(/-/g, '')
@@ -131,14 +176,14 @@ authRouter.post('/sign-in/email', async (c) => {
       expiresAt,
       createdAt: now,
       updatedAt: now,
-      ipAddress: c.req.header('CF-Connecting-IP') || '127.0.0.1',
+      ipAddress,
       userAgent: c.req.header('User-Agent') || 'Unknown',
     })
 
     setCookie(c, SESSION_COOKIE_NAME, token, {
       path: '/',
-      httpOnly: false,
-      secure: false,
+      httpOnly: true,
+      secure: new URL(c.req.url).protocol === 'https:',
       sameSite: 'Lax',
       maxAge: 30 * 24 * 60 * 60,
     })

@@ -3,6 +3,10 @@ import server from '../src/server'
 import { db } from '../src/db'
 import { organizations, jobs, applicants } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
+import { sessionHeadersFor } from './helpers/auth'
+
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
 import { formatWhatsAppSummary, generateInterviewQuestions } from '../src/utils/summaryExport'
 
 describe('Candidate 1-Page AI Summary Export Tests', () => {
@@ -101,7 +105,7 @@ describe('Candidate 1-Page AI Summary Export Tests', () => {
 
   it('serves structured export and summary via GET /api/applicants/:id', async () => {
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${testCandidateId}`, {
-      headers: { 'x-organization-id': String(orgId) }
+      headers: org1Headers
     }))
 
     expect(res.status).toBe(200)
@@ -122,7 +126,7 @@ describe('Candidate 1-Page AI Summary Export Tests', () => {
 
   it('serves dedicated summary endpoint via GET /api/applicants/:id/summary', async () => {
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${testCandidateId}/summary`, {
-      headers: { 'x-organization-id': String(orgId) }
+      headers: org1Headers
     }))
 
     expect(res.status).toBe(200)

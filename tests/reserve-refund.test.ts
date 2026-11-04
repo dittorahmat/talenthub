@@ -3,6 +3,10 @@ import server from '../src/server'
 import { db } from '../src/db'
 import { organizations, jobs, applicants, creditWallets, creditTransactions } from '../src/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { sessionHeadersFor } from './helpers/auth'
+
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
 import { addCredit, getWallet, reserveCredit, refundCredit, commitCredit } from '../src/services/walletService'
 
 describe('Atomic Reserve and Refund on Failure Integration Tests', () => {
@@ -87,7 +91,7 @@ Fullstack Engineer
 
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${candidate.id}/resume`, {
       method: 'POST',
-      headers: { 'x-organization-id': String(orgId) },
+      headers: org1Headers,
       body: form
     }))
 
@@ -132,7 +136,7 @@ Fullstack Engineer
 
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${candidate.id}/resume`, {
       method: 'POST',
-      headers: { 'x-organization-id': String(orgId) },
+      headers: org1Headers,
       body: form
     }))
 
@@ -194,7 +198,7 @@ Fullstack Engineer
 
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${candidate.id}/resume`, {
       method: 'POST',
-      headers: { 'x-organization-id': String(orgId) },
+      headers: org1Headers,
       body: form
     }))
 

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { initCloudflareD1 } from './db'
+import { DEFAULT_WORKER_ORIGIN, resolveAllowedOrigins } from './config/origins'
 import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
@@ -24,7 +25,14 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.use('*', cors())
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.APP_ORIGIN, DEFAULT_WORKER_ORIGIN)
+
+app.use('*', cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+}))
 app.use('*', async (c, next) => {
   if (c.env?.DB) {
     initCloudflareD1(c.env.DB)

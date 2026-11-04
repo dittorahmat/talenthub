@@ -4,6 +4,10 @@ import { getWallet, deductCredit } from '../src/services/walletService'
 import { db } from '../src/db'
 import { organizations, paymentInvoices } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
+import { sessionHeadersFor } from './helpers/auth'
+
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
 
 describe('Payment Gateway Credit Top-up Integration Tests', () => {
   beforeAll(async () => {
@@ -20,7 +24,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
 
   it('fetches credit packages list via GET /api/billing/packages', async () => {
     const res = await server.fetch(new Request('http://localhost:3001/api/billing/packages', {
-      headers: { 'x-organization-id': '1' },
+      headers: org1Headers,
     }))
 
     expect(res.status).toBe(200)
@@ -49,7 +53,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': '1',
+        ...org1Headers,
       },
       body: JSON.stringify({
         packageId: 'growth',
@@ -75,7 +79,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': '2',
+        ...org2Headers,
       },
       body: JSON.stringify({
         packageId: 'starter',
@@ -101,7 +105,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': String(orgId),
+        ...org1Headers,
       },
       body: JSON.stringify({
         packageId: 'starter',
@@ -115,7 +119,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
     const payRes = await server.fetch(new Request(`http://localhost:3001/api/billing/simulate-pay/${invoiceId}`, {
       method: 'POST',
       headers: {
-        'x-organization-id': String(orgId),
+        ...org1Headers,
       },
     }))
 
@@ -133,7 +137,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
     const rePayRes = await server.fetch(new Request(`http://localhost:3001/api/billing/simulate-pay/${invoiceId}`, {
       method: 'POST',
       headers: {
-        'x-organization-id': String(orgId),
+        ...org1Headers,
       },
     }))
     expect(rePayRes.status).toBe(200)
@@ -156,7 +160,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': String(orgId),
+        ...org2Headers,
       },
       body: JSON.stringify({
         packageId: 'growth',
@@ -171,7 +175,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': String(orgId),
+        ...org2Headers,
       },
       body: JSON.stringify({
         order_id: invoiceId,
@@ -191,7 +195,7 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': String(orgId),
+        ...org2Headers,
       },
       body: JSON.stringify({
         order_id: invoiceId,

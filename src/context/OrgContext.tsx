@@ -46,9 +46,17 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchOrganizations = async () => {
     try {
       const res = await fetch('/api/organizations')
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        setOrganizations(data)
+      const data: unknown = await res.json()
+      const list: Organization[] = Array.isArray(data)
+        ? (data as Organization[])
+        : data !== null &&
+            typeof data === 'object' &&
+            'id' in data &&
+            typeof (data as { id: unknown }).id === 'number'
+          ? [data as Organization]
+          : []
+      if (list.length > 0) {
+        setOrganizations(list)
       }
     } catch (err) {
       console.error('Failed to load organizations', err)
@@ -99,9 +107,7 @@ export function getActiveOrgId(): number {
 }
 
 export async function orgFetch(url: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers || {})
-  if (!headers.has('x-organization-id')) {
-    headers.set('x-organization-id', getActiveOrgId().toString())
-  }
-  return fetch(url, { ...init, headers })
+  // The session cookie identifies the tenant; the active organization id is
+  // only a client-side display preference and must not be trusted by the API.
+  return fetch(url, { ...init })
 }
