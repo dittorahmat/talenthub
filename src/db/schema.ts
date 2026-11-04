@@ -142,6 +142,8 @@ export const trialClaims = sqliteTable('trial_claims', {
   adminEmail: text('admin_email').notNull(),
   phoneWhatsapp: text('phone_whatsapp').notNull(),
   otpCode: text('otp_code'),
+  otpHash: text('otp_hash'),
+  otpAttempts: integer('otp_attempts').notNull().default(0),
   otpExpiresAt: text('otp_expires_at'),
   isVerified: integer('is_verified').notNull().default(0),
   claimedAt: text('claimed_at'),

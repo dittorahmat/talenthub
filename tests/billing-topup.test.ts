@@ -4,7 +4,16 @@ import { getWallet, deductCredit } from '../src/services/walletService'
 import { db } from '../src/db'
 import { organizations, paymentInvoices } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
+import { createHmac } from 'node:crypto'
 import { sessionHeadersFor } from './helpers/auth'
+
+const WEBHOOK_SECRET = 'test-webhook-secret'
+process.env.PAYMENT_WEBHOOK_SECRET = WEBHOOK_SECRET
+process.env.PAYMENT_SIMULATION_ENABLED = 'true'
+
+function signWebhook(body: string): string {
+  return createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')
+}
 
 const org1Headers = await sessionHeadersFor(1)
 const org2Headers = await sessionHeadersFor(2)
@@ -171,17 +180,18 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
     const invoiceId = checkoutData.invoice.id
 
     // Webhook 1 (Midtrans style)
+    const webhookBody = JSON.stringify({
+      order_id: invoiceId,
+      transaction_status: 'settlement',
+      gross_amount: '1000000.00',
+    })
     const webhookRes = await server.fetch(new Request('http://localhost:3001/api/billing/webhook', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...org2Headers,
+        'x-webhook-signature': signWebhook(webhookBody),
       },
-      body: JSON.stringify({
-        order_id: invoiceId,
-        transaction_status: 'settlement',
-        gross_amount: '1000000.00',
-      }),
+      body: webhookBody,
     }))
 
     expect(webhookRes.status).toBe(200)
@@ -195,13 +205,9 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...org2Headers,
+        'x-webhook-signature': signWebhook(webhookBody),
       },
-      body: JSON.stringify({
-        order_id: invoiceId,
-        transaction_status: 'settlement',
-        gross_amount: '1000000.00',
-      }),
+      body: webhookBody,
     }))
 
     expect(webhookRetry.status).toBe(200)
@@ -212,6 +218,59 @@ describe('Payment Gateway Credit Top-up Integration Tests', () => {
     // Wallet balance stays identical
     const finalWallet = await getWallet(orgId)
     expect(finalWallet.balance).toBe(startBalance + 500)
+  })
+
+  it('rejects unsigned and wrongly signed webhooks, leaving the invoice pending', async () => {
+    const checkoutRes = await server.fetch(new Request('http://localhost:3001/api/billing/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...org1Headers,
+      },
+      body: JSON.stringify({ packageId: 'starter', paymentMethod: 'qris' }),
+    }))
+    const checkoutData = await checkoutRes.json()
+    const invoiceId = checkoutData.invoice.id
+    const body = JSON.stringify({
+      order_id: invoiceId,
+      transaction_status: 'settlement',
+      gross_amount: '250000.00',
+    })
+
+    const unsigned = await server.fetch(new Request('http://localhost:3001/api/billing/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }))
+    expect(unsigned.status).toBe(401)
+
+    const wrongSignature = await server.fetch(new Request('http://localhost:3001/api/billing/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-webhook-signature': 'deadbeef' },
+      body,
+    }))
+    expect(wrongSignature.status).toBe(401)
+
+    const invoice = await db
+      .select()
+      .from(paymentInvoices)
+      .where(eq(paymentInvoices.id, invoiceId))
+      .get()
+    expect(invoice?.status).toBe('PENDING')
+  })
+
+  it('disables the payment simulation route unless explicitly enabled', async () => {
+    const previous = process.env.PAYMENT_SIMULATION_ENABLED
+    delete process.env.PAYMENT_SIMULATION_ENABLED
+    try {
+      const res = await server.fetch(new Request('http://localhost:3001/api/billing/simulate-pay/INV-TEST', {
+        method: 'POST',
+        headers: org1Headers,
+      }))
+      expect(res.status).toBe(404)
+    } finally {
+      process.env.PAYMENT_SIMULATION_ENABLED = previous
+    }
   })
 
   it('keeps overdraft protection intact with new purchased balances', async () => {

@@ -4,6 +4,7 @@ import { db } from '../src/db'
 import { trialClaims, organizations, creditWallets, creditTransactions } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
 import { isPublicOrDisposableEmail, extractDomain } from '../src/services/antiAbuseService'
+import { __onboardingTestHooks } from '../src/api/onboarding'
 import { sessionHeadersFor } from './helpers/auth'
 
 describe('Anti-Abuse Free Trial Onboarding Tests', () => {
@@ -60,8 +61,8 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
     expect(res.status).toBe(200)
     const data = (await res.json()) as any
     expect(data.status).toBe('OTP_SENT')
-    expect(data.mockOtp).toBeDefined()
-    expect(data.mockOtp.length).toBe(6)
+    expect(data.mockOtp).toBeUndefined()
+    expect(__onboardingTestHooks.lastOtp).toMatch(/^\d{6}$/)
   })
 
   it('verifies OTP and awards exactly 20 free trial credits with TRIAL_GRANT transaction', async () => {
@@ -82,8 +83,9 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
       })
     )
     expect(regRes.status).toBe(200)
-    const regData = (await regRes.json()) as any
-    const otp = regData.mockOtp
+    const otp = __onboardingTestHooks.lastOtp
+    if (!otp) throw new Error('OTP was not generated during registration')
+    expect(otp).toMatch(/^\d{6}$/)
 
     // 2. Verify with wrong OTP
     const wrongRes = await server.fetch(
@@ -154,6 +156,10 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
       })
     )
     const regData1 = (await regRes1.json()) as any
+    expect(regData1.status).toBe('OTP_SENT')
+    const otp1 = __onboardingTestHooks.lastOtp
+    if (!otp1) throw new Error('OTP was not generated during registration')
+    expect(otp1).toMatch(/^\d{6}$/)
 
     // Verify first user
     const verRes1 = await server.fetch(
@@ -163,7 +169,7 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
         body: JSON.stringify({
           companyName: 'PT Unicorn Satu',
           phoneWhatsapp: phone1,
-          otpCode: regData1.mockOtp,
+          otpCode: otp1,
         }),
       })
     )
@@ -205,6 +211,10 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
       })
     )
     const d1 = (await reg1.json()) as any
+    expect(d1.status).toBe('OTP_SENT')
+    const otp2 = __onboardingTestHooks.lastOtp
+    if (!otp2) throw new Error('OTP was not generated during registration')
+    expect(otp2).toMatch(/^\d{6}$/)
     await server.fetch(
       new Request(`${baseUrl}/api/onboarding/verify-otp`, {
         method: 'POST',
@@ -212,7 +222,7 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
         body: JSON.stringify({
           companyName: 'PT Alpha',
           phoneWhatsapp: phone,
-          otpCode: d1.mockOtp,
+          otpCode: otp2,
         }),
       })
     )
@@ -233,5 +243,52 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
     expect(reg2.status).toBe(400)
     const d2 = (await reg2.json()) as any
     expect(d2.error).toContain('telah digunakan untuk klaim Free Trial')
+  })
+
+  it('locks a claim after five wrong OTP attempts', async () => {
+    const uniqueDomain = `lockout-${Date.now()}.com`
+    const phone = `0877${Math.floor(10000000 + Math.random() * 90000000)}`
+
+    const regRes = await server.fetch(
+      new Request(`${baseUrl}/api/onboarding/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: 'PT Lockout Test',
+          adminEmail: `hr@${uniqueDomain}`,
+          phoneWhatsapp: phone,
+        }),
+      })
+    )
+    expect(regRes.status).toBe(200)
+
+    const otp = __onboardingTestHooks.lastOtp
+    if (!otp) throw new Error('OTP was not generated during registration')
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const wrongRes = await server.fetch(
+        new Request(`${baseUrl}/api/onboarding/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneWhatsapp: phone,
+            otpCode: '000000',
+          }),
+        })
+      )
+      expect(wrongRes.status).toBe(400)
+    }
+
+    const lockedRes = await server.fetch(
+      new Request(`${baseUrl}/api/onboarding/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneWhatsapp: phone,
+          otpCode: otp,
+        }),
+      })
+    )
+    expect(lockedRes.status).toBe(429)
   })
 })

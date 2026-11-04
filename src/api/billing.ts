@@ -4,6 +4,26 @@ import { db, sqlite } from '../db'
 import { paymentInvoices } from '../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { addCredit } from '../services/walletService'
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+const WEBHOOK_SIGNATURE_HEADER = 'x-webhook-signature'
+
+function getWebhookSecret(): string | null {
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET?.trim()
+  return secret ? secret : null
+}
+
+if (process.env.NODE_ENV === 'production' && !getWebhookSecret()) {
+  console.error('[billing] PAYMENT_WEBHOOK_SECRET is not configured. Settlement callbacks will be rejected.')
+}
+
+function isValidWebhookSignature(rawBody: string, provided: string | undefined, secret: string): boolean {
+  if (!provided) return false
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex')
+  const normalized = provided.startsWith('sha256=') ? provided.slice('sha256='.length) : provided
+  if (expected.length !== normalized.length) return false
+  return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(normalized, 'utf8'))
+}
 
 export interface CreditPackage {
   id: 'starter' | 'growth' | 'enterprise'
@@ -235,7 +255,23 @@ async function processInvoiceSettlement(invoiceId: string) {
 
 // POST /api/billing/webhook
 billingRouter.post('/webhook', async (c) => {
-  const payload = await c.req.json().catch(() => ({}))
+  const secret = getWebhookSecret()
+  if (!secret) {
+    return c.json({ error: 'Webhook pembayaran belum dikonfigurasi' }, 503)
+  }
+
+  const rawBody = await c.req.text()
+  const signature = c.req.header(WEBHOOK_SIGNATURE_HEADER)
+  if (!isValidWebhookSignature(rawBody, signature, secret)) {
+    return c.json({ error: 'Signature webhook tidak valid' }, 401)
+  }
+
+  let payload: Record<string, any>
+  try {
+    payload = JSON.parse(rawBody)
+  } catch {
+    return c.json({ error: 'Payload webhook tidak valid' }, 400)
+  }
 
   // Support Midtrans format (order_id, transaction_status) or Xendit format (external_id, status)
   const invoiceId = payload.order_id || payload.external_id || payload.invoiceId
@@ -254,6 +290,23 @@ billingRouter.post('/webhook', async (c) => {
   }
 
   try {
+    const invoice = await db
+      .select()
+      .from(paymentInvoices)
+      .where(eq(paymentInvoices.id, invoiceId))
+      .get()
+
+    if (!invoice) {
+      return c.json({ error: 'Invoice not found' }, 404)
+    }
+
+    if (payload.gross_amount !== undefined) {
+      const grossAmount = Number(payload.gross_amount)
+      if (!Number.isFinite(grossAmount) || Math.round(grossAmount) !== invoice.amountIdr) {
+        return c.json({ error: 'Nominal pembayaran tidak sesuai dengan invoice' }, 400)
+      }
+    }
+
     const result = await processInvoiceSettlement(invoiceId)
     return c.json(result)
   } catch (err: any) {
@@ -264,8 +317,14 @@ billingRouter.post('/webhook', async (c) => {
   }
 })
 
-// POST /api/billing/simulate-pay/:invoiceId - helper endpoint for demo/local testing
+// POST /api/billing/simulate-pay/:invoiceId
+// Local-only helper. It is disabled unless explicitly enabled, so no deployed
+// surface can mark an invoice paid without a verified provider callback.
 billingRouter.post('/simulate-pay/:invoiceId', async (c) => {
+  if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+    return c.json({ error: 'Not found' }, 404)
+  }
+
   const invoiceId = c.req.param('invoiceId')
 
   try {
