@@ -49,8 +49,12 @@ export const sqlite: any = new Proxy({}, {
         currentSqlite = new Database('data/talenthub.db')
         currentSqlite.exec('PRAGMA foreign_keys = ON;')
       } catch (e) {
-        // Return dummy/noop handler in worker environment
-        return () => {}
+        // Raw sqlite access is Bun-only. Fail loudly instead of returning a
+        // silent no-op, so a D1 deployment cannot appear to succeed while
+        // writing nothing.
+        throw new Error(
+          'Bun SQLite tidak tersedia di runtime ini. Gunakan Drizzle query builder (db) agar kompatibel dengan Cloudflare D1.',
+        )
       }
     }
     const val = currentSqlite[prop]

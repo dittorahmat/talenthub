@@ -38,7 +38,7 @@ describe('Atomic Reserve and Refund on Failure Integration Tests', () => {
     // Ensure wallet has balance
     const wallet = await getWallet(orgId)
     if (wallet.balance < 10) {
-      await addCredit(orgId, 20, 'TEST_SETUP', 'Top up test balance')
+      await addCredit(orgId, 20, 'INITIAL_GRANT', 'Top up test balance')
     }
   })
 

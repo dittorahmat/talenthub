@@ -126,7 +126,7 @@ describe('AI Screening & Credit Deduction Integration Tests', () => {
     // 1. Ensure org 1 has at least 5 credits
     const walletBefore = await getWallet(orgId)
     if (walletBefore.balance < 5) {
-      await addCredit(orgId, 10, 'TEST_TOPUP', 'Test setup credits')
+      await addCredit(orgId, 10, 'INITIAL_GRANT', 'Test setup credits')
     }
     const balanceBeforeDeduct = (await getWallet(orgId)).balance
 

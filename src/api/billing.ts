@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { OrgEnv } from '../middleware/orgContext'
-import { db, sqlite } from '../db'
+import { db } from '../db'
 import { paymentInvoices } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
-import { addCredit } from '../services/walletService'
+import { eq, desc, and } from 'drizzle-orm'
+import { addCredit, getWallet } from '../services/walletService'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 const WEBHOOK_SIGNATURE_HEADER = 'x-webhook-signature'
@@ -183,72 +183,80 @@ billingRouter.post('/checkout', async (c) => {
 })
 
 /**
- * Common logic to settle invoice and add credits idempotently
+ * Common logic to settle invoice and add credits idempotently.
+ *
+ * The transition PENDING -> PAID is a single conditional UPDATE, so two
+ * concurrent callbacks can never both grant credits. Only the Drizzle query
+ * builder is used, so this runs unchanged on Cloudflare D1.
  */
 async function processInvoiceSettlement(invoiceId: string) {
-  // Use a transaction on sqlite to atomically check status, update to PAID, and add credit
-  const tx = sqlite.transaction(() => {
-    // 1. Get invoice with lock semantics in sqlite
-    const invoiceStmt = sqlite.prepare(`SELECT * FROM payment_invoices WHERE id = ?`)
-    const inv = invoiceStmt.get(invoiceId) as any
+  const invoiceList = await db
+    .select()
+    .from(paymentInvoices)
+    .where(eq(paymentInvoices.id, invoiceId))
+    .all()
 
-    if (!inv) {
-      throw new Error('Invoice not found')
-    }
+  const invoice = invoiceList[0]
+  if (!invoice) {
+    throw new Error('Invoice not found')
+  }
 
-    // 2. Check idempotency: If already paid, do NOT credit again
-    if (inv.status === 'PAID') {
-      // Get current balance
-      const walletStmt = sqlite.prepare(`SELECT balance FROM credit_wallets WHERE organization_id = ?`)
-      const wallet = walletStmt.get(inv.organization_id) as any
-      return {
-        alreadyPaid: true,
-        invoice: inv,
-        balance: wallet ? wallet.balance : 0,
-      }
-    }
-
-    const nowIso = new Date().toISOString()
-
-    // 3. Update invoice status to PAID
-    const updateInvStmt = sqlite.prepare(`
-      UPDATE payment_invoices 
-      SET status = 'PAID', paid_at = ?, updated_at = ?
-      WHERE id = ?
-    `)
-    updateInvStmt.run(nowIso, nowIso, invoiceId)
-
-    return {
-      alreadyPaid: false,
-      invoice: { ...inv, status: 'PAID', paid_at: nowIso },
-    }
-  })
-
-  const txResult = tx()
-
-  if (txResult.alreadyPaid) {
+  if (invoice.status === 'PAID') {
+    const wallet = await getWallet(invoice.organizationId)
     return {
       status: 'success',
       message: 'Invoice already processed (idempotent)',
-      invoiceId: txResult.invoice.id,
-      balance: txResult.balance,
+      invoiceId: invoice.id,
+      balance: wallet.balance,
       creditsAdded: 0,
     }
   }
 
-  // 4. Add credit to wallet
+  const nowIso = new Date().toISOString()
+  const claimedInvoices = await db
+    .update(paymentInvoices)
+    .set({ status: 'PAID', paidAt: nowIso, updatedAt: nowIso })
+    .where(and(eq(paymentInvoices.id, invoiceId), eq(paymentInvoices.status, 'PENDING')))
+    .returning()
+    .all()
+
+  if (claimedInvoices.length === 0) {
+    const currentList = await db
+      .select()
+      .from(paymentInvoices)
+      .where(eq(paymentInvoices.id, invoiceId))
+      .all()
+    const current = currentList[0]
+    if (!current) {
+      throw new Error('Invoice not found')
+    }
+    if (current.status === 'PAID') {
+      const wallet = await getWallet(current.organizationId)
+      return {
+        status: 'success',
+        message: 'Invoice already processed (idempotent)',
+        invoiceId: current.id,
+        balance: wallet.balance,
+        creditsAdded: 0,
+      }
+    }
+    throw new Error(`Invoice tidak dapat diselesaikan dari status ${current.status}`)
+  }
+
+  const settledInvoice = claimedInvoices[0]
+
   const addRes = await addCredit(
-    txResult.invoice.organization_id,
-    txResult.invoice.credits,
+    settledInvoice.organizationId,
+    settledInvoice.credits,
     'PURCHASE',
-    `Pembelian paket kredit: ${txResult.invoice.package_name} (${txResult.invoice.credits} Kredit)`
+    `Pembelian paket kredit: ${settledInvoice.packageName} (${settledInvoice.credits} Kredit)`,
   )
 
   return {
     status: 'success',
-    invoiceId: txResult.invoice.id,
+    invoiceId: settledInvoice.id,
     balance: addRes.newBalance,
-    creditsAdded: txResult.invoice.credits,
+    creditsAdded: settledInvoice.credits,
     transaction: addRes.transaction,
   }
 }

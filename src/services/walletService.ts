@@ -1,6 +1,6 @@
-import { db, sqlite } from '../db'
+import { db } from '../db'
 import { creditWallets, creditTransactions } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and, gte, sql } from 'drizzle-orm'
 
 export interface WalletData {
   id: number
@@ -32,34 +32,61 @@ export interface TransactionData {
   createdAt: string
 }
 
-function mapTransactionRow(row: any): TransactionData {
+function mapTransactionRow(row: {
+  id: number
+  walletId: number
+  organizationId: number
+  amount: number
+  type: string
+  description: string | null
+  balanceAfter: number
+  createdAt: string
+}): TransactionData {
   return {
     id: row.id,
-    walletId: row.wallet_id ?? row.walletId,
-    organizationId: row.organization_id ?? row.organizationId,
+    walletId: row.walletId,
+    organizationId: row.organizationId,
     amount: row.amount,
-    type: row.type,
+    type: row.type as CreditTransactionType,
     description: row.description,
-    balanceAfter: row.balance_after ?? row.balanceAfter,
-    createdAt: row.created_at ?? row.createdAt,
+    balanceAfter: row.balanceAfter,
+    createdAt: row.createdAt,
   }
 }
 
 /**
  * Ensures a wallet exists for the given organization.
- * If not, creates one with 0 balance.
+ * Safe to call concurrently: the unique organization_id constraint decides the
+ * winner and the loser re-reads the row.
  */
 export async function getOrCreateWallet(orgId: number): Promise<WalletData> {
-  let wallet = await db.select().from(creditWallets).where(eq(creditWallets.organizationId, orgId)).get()
-  if (!wallet) {
-    const now = new Date().toISOString()
-    wallet = db.insert(creditWallets).values({
-      organizationId: orgId,
-      balance: 0,
-      updatedAt: now,
-    }).returning().get()
+  const existingList = await db
+    .select()
+    .from(creditWallets)
+    .where(eq(creditWallets.organizationId, orgId))
+    .all()
+
+  if (existingList.length > 0) {
+    return existingList[0]
   }
-  return wallet
+
+  const now = new Date().toISOString()
+  await db
+    .insert(creditWallets)
+    .values({ organizationId: orgId, balance: 0, updatedAt: now })
+    .onConflictDoNothing()
+
+  const createdList = await db
+    .select()
+    .from(creditWallets)
+    .where(eq(creditWallets.organizationId, orgId))
+    .all()
+
+  if (createdList.length === 0) {
+    throw new Error(`Gagal membuat dompet kredit untuk organisasi ${orgId}`)
+  }
+
+  return createdList[0]
 }
 
 /**
@@ -83,70 +110,57 @@ export async function getTransactions(orgId: number, limit: number = 50): Promis
 }
 
 /**
- * Deduct credit using atomic conditional update (balance >= amount).
- * Throws an error if balance is insufficient or deduction fails.
+ * Deduct credit using an atomic conditional update (balance >= amount).
+ * Works identically on Cloudflare D1 and local SQLite because it relies only on
+ * the Drizzle query builder, never on a runtime-specific transaction primitive.
  */
 export async function deductCredit(
   orgId: number,
   amount: number,
-  type: string,
-  description?: string
+  type: CreditTransactionType,
+  description?: string,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   if (amount <= 0) {
     throw new Error('Deduction amount must be greater than 0')
   }
 
-  // Ensure wallet exists
   await getOrCreateWallet(orgId)
   const now = new Date().toISOString()
 
-  // Use a transaction on sqlite to atomically update and write ledger
-  const tx = sqlite.transaction(() => {
-    // Atomic conditional update
-    const updateStmt = sqlite.prepare(`
-      UPDATE credit_wallets 
-      SET balance = balance - ?, updated_at = ?
-      WHERE organization_id = ? AND balance >= ?
-    `)
-    const result = updateStmt.run(amount, now, orgId, amount)
+  const updatedWallets = await db
+    .update(creditWallets)
+    .set({
+      balance: sql`${creditWallets.balance} - ${amount}`,
+      updatedAt: now,
+    })
+    .where(and(eq(creditWallets.organizationId, orgId), gte(creditWallets.balance, amount)))
+    .returning()
+    .all()
 
-    if (result.changes === 0) {
-      throw new Error('Insufficient credit balance')
-    }
+  if (updatedWallets.length === 0) {
+    throw new Error('Insufficient credit balance')
+  }
 
-    // Retrieve updated balance & wallet id
-    const getStmt = sqlite.prepare(`
-      SELECT id, balance FROM credit_wallets WHERE organization_id = ?
-    `)
-    const updatedWallet = getStmt.get(orgId) as { id: number; balance: number }
+  const wallet = updatedWallets[0]
 
-    // Insert transaction ledger record
-    const insertTxStmt = sqlite.prepare(`
-      INSERT INTO credit_transactions (wallet_id, organization_id, amount, type, description, balance_after, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      RETURNING *
-    `)
-    const txRecord = insertTxStmt.get(
-      updatedWallet.id,
-      orgId,
-      -Math.abs(amount),
+  const inserted = await db
+    .insert(creditTransactions)
+    .values({
+      walletId: wallet.id,
+      organizationId: orgId,
+      amount: -Math.abs(amount),
       type,
-      description ?? null,
-      updatedWallet.balance,
-      now
-    ) as any
+      description: description ?? null,
+      balanceAfter: wallet.balance,
+      createdAt: now,
+    })
+    .returning()
+    .get()
 
-    return {
-      newBalance: updatedWallet.balance,
-      transaction: mapTransactionRow(txRecord),
-    }
-  })
-
-  const res = tx()
   return {
     success: true,
-    newBalance: res.newBalance,
-    transaction: res.transaction,
+    newBalance: wallet.balance,
+    transaction: mapTransactionRow(inserted),
   }
 }
 
@@ -157,65 +171,57 @@ export async function deductCredit(
 export async function reserveCredit(
   orgId: number,
   amount: number,
-  description?: string
+  description?: string,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   return deductCredit(orgId, amount, 'RESERVED', description ?? `Reserve credit for processing`)
 }
 
 /**
  * Finalizes deduction after reservation.
- * Since reservation already debited the balance, commitCredit settles the transaction
- * and updates the reservation note or logs settlement with amount 0 to prevent double debiting.
+ * Since reservation already debited the balance, commitCredit settles the
+ * reservation with an amount-0 audit row so the balance is never debited twice.
  */
 export async function commitCredit(
   orgId: number,
   reservationRef?: string,
   description?: string,
-  _amount: number = 1
+  _amount: number = 1,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   const wallet = await getOrCreateWallet(orgId)
   const now = new Date().toISOString()
+  const descText =
+    description ||
+    (reservationRef ? `Settled screening (Ref: ${reservationRef})` : `Komitmen screening CV selesai`)
 
-  const tx = sqlite.transaction(() => {
-    // Audit log settlement row with amount 0 so balance sum remains exact and double debit is prevented
-    const insertTxStmt = sqlite.prepare(`
-      INSERT INTO credit_transactions (wallet_id, organization_id, amount, type, description, balance_after, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      RETURNING *
-    `)
-    const descText = description || (reservationRef ? `Settled screening (Ref: ${reservationRef})` : `Komitmen screening CV selesai`)
-    const txRecord = insertTxStmt.get(
-      wallet.id,
-      orgId,
-      0, // Amount is 0 because credit was already decremented during reserveCredit
-      'SETTLED',
-      descText,
-      wallet.balance,
-      now
-    ) as any
+  const inserted = await db
+    .insert(creditTransactions)
+    .values({
+      walletId: wallet.id,
+      organizationId: orgId,
+      amount: 0,
+      type: 'SETTLED',
+      description: descText,
+      balanceAfter: wallet.balance,
+      createdAt: now,
+    })
+    .returning()
+    .get()
 
-    return {
-      newBalance: wallet.balance,
-      transaction: mapTransactionRow(txRecord),
-    }
-  })
-
-  const res = tx()
   return {
     success: true,
-    newBalance: res.newBalance,
-    transaction: res.transaction,
+    newBalance: wallet.balance,
+    transaction: mapTransactionRow(inserted),
   }
 }
 
 /**
- * Refund credit back to organization wallet atomically and log transaction with type 'REFUND' or specified type.
+ * Refund credit back to the organization wallet and log the ledger entry.
  */
 export async function refundCredit(
   orgId: number,
   amount: number,
-  reason: string = 'REFUND',
-  description?: string
+  reason: CreditTransactionType = 'REFUND',
+  description?: string,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   const descText = description || `Refund credit: ${reason}`
   return addCredit(orgId, amount, reason, descText)
@@ -227,8 +233,8 @@ export async function refundCredit(
 export async function addCredit(
   orgId: number,
   amount: number,
-  type: string,
-  description?: string
+  type: CreditTransactionType,
+  description?: string,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   if (amount <= 0) {
     throw new Error('Credit amount must be greater than 0')
@@ -237,44 +243,39 @@ export async function addCredit(
   await getOrCreateWallet(orgId)
   const now = new Date().toISOString()
 
-  const tx = sqlite.transaction(() => {
-    const updateStmt = sqlite.prepare(`
-      UPDATE credit_wallets 
-      SET balance = balance + ?, updated_at = ?
-      WHERE organization_id = ?
-    `)
-    updateStmt.run(amount, now, orgId)
+  const updatedWallets = await db
+    .update(creditWallets)
+    .set({
+      balance: sql`${creditWallets.balance} + ${amount}`,
+      updatedAt: now,
+    })
+    .where(eq(creditWallets.organizationId, orgId))
+    .returning()
+    .all()
 
-    const getStmt = sqlite.prepare(`
-      SELECT id, balance FROM credit_wallets WHERE organization_id = ?
-    `)
-    const updatedWallet = getStmt.get(orgId) as { id: number; balance: number }
+  if (updatedWallets.length === 0) {
+    throw new Error(`Dompet kredit untuk organisasi ${orgId} tidak ditemukan`)
+  }
 
-    const insertTxStmt = sqlite.prepare(`
-      INSERT INTO credit_transactions (wallet_id, organization_id, amount, type, description, balance_after, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      RETURNING *
-    `)
-    const txRecord = insertTxStmt.get(
-      updatedWallet.id,
-      orgId,
-      Math.abs(amount),
+  const wallet = updatedWallets[0]
+
+  const inserted = await db
+    .insert(creditTransactions)
+    .values({
+      walletId: wallet.id,
+      organizationId: orgId,
+      amount: Math.abs(amount),
       type,
-      description ?? null,
-      updatedWallet.balance,
-      now
-    ) as any
+      description: description ?? null,
+      balanceAfter: wallet.balance,
+      createdAt: now,
+    })
+    .returning()
+    .get()
 
-    return {
-      newBalance: updatedWallet.balance,
-      transaction: mapTransactionRow(txRecord),
-    }
-  })
-
-  const res = tx()
   return {
     success: true,
-    newBalance: res.newBalance,
-    transaction: res.transaction,
+    newBalance: wallet.balance,
+    transaction: mapTransactionRow(inserted),
   }
 }
