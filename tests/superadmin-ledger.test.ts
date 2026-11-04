@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll } from 'bun:test'
 import server from '../src/server'
 import { db } from '../src/db'
-import { organizations, creditWallets } from '../src/db/schema'
-import { eq } from 'drizzle-orm'
+import { organizations } from '../src/db/schema'
+import { sessionHeadersFor } from './helpers/auth'
+
+const superadminHeaders = await sessionHeadersFor(1, 'superadmin')
+const adminHeaders = await sessionHeadersFor(2, 'admin')
 
 describe('Superadmin Ledger & Audit Integration Tests', () => {
   beforeAll(async () => {
@@ -10,19 +13,33 @@ describe('Superadmin Ledger & Audit Integration Tests', () => {
     if (orgs.length === 0) {
       const now = new Date().toISOString()
       await db.insert(organizations).values([
-        { id: 1, name: 'Tech Satu Solusi', slug: 'tech-satu-solusi', createdAt: now }
+        { id: 1, name: 'Tech Satu Solusi', slug: 'tech-satu-solusi', createdAt: now },
       ])
     }
   })
 
-  it('rejects unauthorized access without superadmin credentials', async () => {
+  it('rejects unauthorized access without a superadmin session', async () => {
     const res = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview'))
     expect(res.status).toBe(403)
   })
 
-  it('provides overview including tenants, users, and recent audit logs with dev-bypass', async () => {
+  it('rejects a non-superadmin session', async () => {
     const res = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview', {
-      headers: { 'X-Superadmin-Key': 'dev-bypass' }
+      headers: adminHeaders,
+    }))
+    expect(res.status).toBe(403)
+  })
+
+  it('ignores the removed development bypass header', async () => {
+    const res = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview', {
+      headers: { 'X-Superadmin-Key': 'dev-bypass' },
+    }))
+    expect(res.status).toBe(403)
+  })
+
+  it('provides overview including tenants, users, and recent audit logs for a superadmin session', async () => {
+    const res = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview', {
+      headers: superadminHeaders,
     }))
     expect(res.status).toBe(200)
     const data: any = await res.json()
@@ -33,36 +50,33 @@ describe('Superadmin Ledger & Audit Integration Tests', () => {
   })
 
   it('injects credit with double-entry SUPERADMIN_ADJUSTMENT ledger mutation', async () => {
-    // 1. Get initial balance
     const overviewRes = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview', {
-      headers: { 'X-Superadmin-Key': 'dev-bypass' }
+      headers: superadminHeaders,
     }))
     const initialOverview: any = await overviewRes.json()
     const targetOrg = initialOverview.organizations[0]
     expect(targetOrg).toBeDefined()
     const previousBalance = targetOrg.balance
 
-    // 2. Inject +50 credits
     const injectRes = await server.fetch(new Request('http://localhost:3001/api/superadmin/inject-credit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Superadmin-Key': 'dev-bypass'
+        ...superadminHeaders,
       },
       body: JSON.stringify({
         organizationId: targetOrg.id,
         amount: 50,
-        note: 'Audit test: manual credit adjustment'
-      })
+        note: 'Audit test: manual credit adjustment',
+      }),
     }))
     expect(injectRes.status).toBe(200)
     const injectData: any = await injectRes.json()
     expect(injectData.success).toBe(true)
     expect(injectData.wallet.balance).toBe(previousBalance + 50)
 
-    // 3. Verify in overview audit log
     const updatedRes = await server.fetch(new Request('http://localhost:3001/api/superadmin/overview', {
-      headers: { 'X-Superadmin-Key': 'dev-bypass' }
+      headers: superadminHeaders,
     }))
     const updatedOverview: any = await updatedRes.json()
     const latestAudit = updatedOverview.recentAuditLogs[0]

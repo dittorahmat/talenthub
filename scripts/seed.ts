@@ -1,6 +1,7 @@
 import { db, sqlite } from '../src/db'
 import { organizations, jobs, applicants, notes, activities, inboxItems, jobKnockouts, creditWallets, creditTransactions, user, account } from '../src/db/schema'
 import { mockScreening } from '../src/api/screening'
+import { hashPassword } from 'better-auth/crypto'
 import { eq } from 'drizzle-orm'
 
 sqlite.exec('DELETE FROM verification;')
@@ -39,50 +40,67 @@ const org1 = insertedOrgs[0]
 const org2 = insertedOrgs[1]
 const defaultOrgId = org1.id // id 1 ("tech-satu-solusi")
 
-// Seed Default Users (Superadmin & Demo Recruiter)
-const superadminUserId = 'usr_superadmin_01'
-db.insert(user).values({
-  id: superadminUserId,
-  name: 'Super Admin TalentHub',
-  email: 'superadmin@talenthub.ai',
-  emailVerified: true,
-  role: 'superadmin',
-  organizationId: org1.id,
-  createdAt: nowTs,
-  updatedAt: nowTs,
-}).run()
+// Seed operator accounts only when credentials are supplied explicitly.
+// No working credential is ever committed, seeded by default, or published in docs.
+const superadminEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase()
+const superadminPassword = process.env.SUPERADMIN_PASSWORD
 
-db.insert(account).values({
-  id: 'acc_superadmin_01',
-  accountId: 'superadmin@talenthub.ai',
-  providerId: 'credential',
-  userId: superadminUserId,
-  password: '916f918a252c6811048ff3fa3648d19a:20b42da1fd2e65cceac18bc857fe61f6b872cbf824d747dbc2964bfefbecc9e33bd94190c4ce2399beedd4790696f4f6e3d8be1c414734d09150b15c513f0e2e', // Scrypt hash of Admin123!@#
-  createdAt: nowTs,
-  updatedAt: nowTs,
-}).run()
+if (superadminEmail && superadminPassword) {
+  const superadminUserId = 'usr_superadmin_01'
+  await db.insert(user).values({
+    id: superadminUserId,
+    name: 'Super Admin TalentHub',
+    email: superadminEmail,
+    emailVerified: true,
+    role: 'superadmin',
+    organizationId: org1.id,
+    createdAt: nowTs,
+    updatedAt: nowTs,
+  }).run()
 
-const demoUserId = 'usr_recruiter_01'
-db.insert(user).values({
-  id: demoUserId,
-  name: 'Demo HR Lead',
-  email: 'recruiter@tech1solusi.com',
-  emailVerified: true,
-  role: 'admin',
-  organizationId: org1.id,
-  createdAt: nowTs,
-  updatedAt: nowTs,
-}).run()
+  await db.insert(account).values({
+    id: 'acc_superadmin_01',
+    accountId: superadminEmail,
+    providerId: 'credential',
+    userId: superadminUserId,
+    password: await hashPassword(superadminPassword),
+    createdAt: nowTs,
+    updatedAt: nowTs,
+  }).run()
 
-db.insert(account).values({
-  id: 'acc_recruiter_01',
-  accountId: 'recruiter@tech1solusi.com',
-  providerId: 'credential',
-  userId: demoUserId,
-  password: '55db2f558d7c09573caa6f91a43642b2:454c5afa6d262c72e8973784db9d903fcaf117f3260d2c5afc182a3a330cc7923da4a7d8398e9f6c488c6a41ffe70200bb5876305f534d07b6da5307efc43b38', // Scrypt hash of Demo123!@#
-  createdAt: nowTs,
-  updatedAt: nowTs,
-}).run()
+  console.log(`Seeded superadmin account for ${superadminEmail}`)
+} else {
+  console.log('No superadmin account seeded. Set SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD to create one.')
+}
+
+const demoEmail = process.env.DEMO_USER_EMAIL?.trim().toLowerCase()
+const demoPassword = process.env.DEMO_USER_PASSWORD
+
+if (demoEmail && demoPassword) {
+  const demoUserId = 'usr_recruiter_01'
+  await db.insert(user).values({
+    id: demoUserId,
+    name: 'Demo HR Lead',
+    email: demoEmail,
+    emailVerified: true,
+    role: 'admin',
+    organizationId: org1.id,
+    createdAt: nowTs,
+    updatedAt: nowTs,
+  }).run()
+
+  await db.insert(account).values({
+    id: 'acc_recruiter_01',
+    accountId: demoEmail,
+    providerId: 'credential',
+    userId: demoUserId,
+    password: await hashPassword(demoPassword),
+    createdAt: nowTs,
+    updatedAt: nowTs,
+  }).run()
+
+  console.log(`Seeded demo recruiter account for ${demoEmail}`)
+}
 
 
 // Seed Wallets & Transactions

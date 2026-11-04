@@ -86,8 +86,6 @@ CREATE TABLE user (
     role TEXT DEFAULT 'recruiter',
     organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE
   );
-INSERT INTO user VALUES('usr_superadmin_01','Super Admin TalentHub','superadmin@talenthub.ai',1,NULL,1793694969,1793694969,'superadmin',1);
-INSERT INTO user VALUES('usr_recruiter_01','Demo HR Lead','recruiter@tech1solusi.com',1,NULL,1793694969,1793694969,'admin',1);
 CREATE TABLE session (
     id TEXT PRIMARY KEY,
     expires_at INTEGER NOT NULL,
@@ -113,8 +111,6 @@ CREATE TABLE account (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
-INSERT INTO account VALUES('acc_superadmin_01','superadmin@talenthub.ai','credential','usr_superadmin_01',NULL,NULL,NULL,NULL,NULL,NULL,'916f918a252c6811048ff3fa3648d19a:20b42da1fd2e65cceac18bc857fe61f6b872cbf824d747dbc2964bfefbecc9e33bd94190c4ce2399beedd4790696f4f6e3d8be1c414734d09150b15c513f0e2e',1793694969,1793694969);
-INSERT INTO account VALUES('acc_recruiter_01','recruiter@tech1solusi.com','credential','usr_recruiter_01',NULL,NULL,NULL,NULL,NULL,NULL,'55db2f558d7c09573caa6f91a43642b2:454c5afa6d262c72e8973784db9d903fcaf117f3260d2c5afc182a3a330cc7923da4a7d8398e9f6c488c6a41ffe70200bb5876305f534d07b6da5307efc43b38',1793694969,1793694969);
 CREATE TABLE verification (
     id TEXT PRIMARY KEY,
     identifier TEXT NOT NULL,

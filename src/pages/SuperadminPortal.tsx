@@ -84,9 +84,7 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/superadmin/overview', {
-        headers: { 'X-Superadmin-Key': 'dev-bypass' }
-      })
+      const res = await fetch('/api/superadmin/overview')
       if (!res.ok) throw new Error('Gagal memuat ringkasan portal superadmin')
       const json = (await res.json()) as SuperadminOverviewData
       setData(json)
@@ -121,7 +119,6 @@ export function SuperadminPortal({ onBackToApp }: SuperadminPortalProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Superadmin-Key': 'dev-bypass'
         },
         body: JSON.stringify({
           organizationId: selectedOrgId,
