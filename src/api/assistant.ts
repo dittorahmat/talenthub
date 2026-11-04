@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { OrgEnv } from '../middleware/orgContext'
 
 type FAQEntry = {
   id: string
@@ -98,13 +99,16 @@ function scoreEntry(query: string, entry: FAQEntry): number {
   return hits
 }
 
-export const assistantRouter = new Hono()
+export const assistantRouter = new Hono<OrgEnv>()
 
 const PENDING_STATUS = 'menunggu persetujuan'
+const MAX_LEAVE_REQUESTS = 500
 
 let leaveCounter = 1024
 type LeaveRequest = {
   reference: string
+  ownerUserId: string
+  organizationId: number
   type?: string
   startDate?: string
   endDate?: string
@@ -143,6 +147,9 @@ assistantRouter.get('/answer', (c) => {
 })
 
 assistantRouter.post('/leave', async (c) => {
+  const user = c.get('user')
+  const organizationId = c.get('orgId')
+
   let body: Record<string, unknown> = {}
   try {
     body = await c.req.json()
@@ -159,6 +166,8 @@ assistantRouter.post('/leave', async (c) => {
 
   const entry: LeaveRequest = {
     reference,
+    ownerUserId: user.id,
+    organizationId,
     type,
     startDate,
     endDate,
@@ -166,13 +175,22 @@ assistantRouter.post('/leave', async (c) => {
     status: PENDING_STATUS,
     createdAt: new Date().toISOString(),
   }
+
+  if (leaveRequests.length >= MAX_LEAVE_REQUESTS) {
+    leaveRequests.shift()
+  }
   leaveRequests.push(entry)
 
   return c.json({ success: true, reference, status: PENDING_STATUS }, 201)
 })
 
 assistantRouter.get('/requests', (c) => {
-  return c.json({ requests: leaveRequests })
+  const user = c.get('user')
+  const organizationId = c.get('orgId')
+  const visible = leaveRequests
+    .filter((request) => request.ownerUserId === user.id && request.organizationId === organizationId)
+    .map(({ ownerUserId: _ownerUserId, organizationId: _organizationId, ...rest }) => rest)
+  return c.json({ requests: visible })
 })
 
 // Utility for tests to reset state if needed (not exposed as route)

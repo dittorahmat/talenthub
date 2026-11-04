@@ -108,13 +108,14 @@ billingRouter.get('/invoices', async (c) => {
   return c.json({ invoices })
 })
 
-// GET /api/billing/invoice/:invoiceId - get specific invoice
+// GET /api/billing/invoice/:invoiceId - get specific invoice for the caller's organization
 billingRouter.get('/invoice/:invoiceId', async (c) => {
+  const orgId = c.get('orgId')
   const invoiceId = c.req.param('invoiceId')
   const invoice = await db
     .select()
     .from(paymentInvoices)
-    .where(eq(paymentInvoices.id, invoiceId))
+    .where(and(eq(paymentInvoices.id, invoiceId), eq(paymentInvoices.organizationId, orgId)))
     .get()
 
   if (!invoice) {

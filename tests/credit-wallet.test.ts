@@ -99,7 +99,8 @@ describe('Credit Wallet & Ledger Tests', () => {
     expect(data.balance).toBe(initialBalance + 100)
   })
 
-  it('supports mock topup API endpoint POST /api/wallet/topup', async () => {
+  it('rejects the removed direct top-up endpoint and leaves the balance unchanged', async () => {
+    const walletBefore = await getWallet(2)
     const res = await server.fetch(new Request('http://localhost:3001/api/wallet/topup', {
       method: 'POST',
       headers: {
@@ -108,9 +109,9 @@ describe('Credit Wallet & Ledger Tests', () => {
       },
       body: JSON.stringify({ amount: 50, description: 'Test Topup 50' }),
     }))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.success).toBe(true)
-    expect(data.transaction.amount).toBe(50)
+    expect(res.status).toBe(404)
+
+    const walletAfter = await getWallet(2)
+    expect(walletAfter.balance).toBe(walletBefore.balance)
   })
 })
