@@ -1,1 +1,0 @@
-React TypeScript JavaScript Node.js Git CI/CD Docker AWS

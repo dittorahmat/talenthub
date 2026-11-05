@@ -118,4 +118,65 @@ describe('Async Batch Upload with Queue & Preflight Tests', () => {
     expect(batchStatus.completed).toBeGreaterThanOrEqual(2)
     expect(batchStatus.failed).toBeGreaterThanOrEqual(1)
   })
+
+  it('cancels queued items, refunds them, and never processes them later', async () => {
+    const suffix = Date.now()
+    const org = (await db
+      .insert(organizations)
+      .values({
+        name: `Cancel Corp ${suffix}`,
+        slug: `cancel-corp-${suffix}`,
+        createdAt: new Date().toISOString(),
+      })
+      .returning()
+      .get()) as any
+
+    const cancelOrgId = org.id
+    await db.insert(creditWallets).values({
+      organizationId: cancelOrgId,
+      balance: 5,
+      updatedAt: new Date().toISOString(),
+    }).run()
+
+    const job = (await db
+      .insert(jobs)
+      .values({
+        organizationId: cancelOrgId,
+        title: 'Backend Engineer',
+        location: 'Remote',
+        remote: 'Yes',
+        postedAt: '2026-11-03',
+      })
+      .returning()
+      .get()) as any
+
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      filename: `cancel-candidate-${i}.txt`,
+      buffer: Buffer.from('React TypeScript Node.js Docker SQL'),
+    }))
+
+    const enqueueResult = await BatchQueueService.enqueueBatch({
+      orgId: cancelOrgId,
+      jobId: job.id,
+      files,
+      autoProcessAsync: false,
+    })
+    expect(enqueueResult.queuedCount).toBe(5)
+
+    const cancelResult = await BatchQueueService.cancelQueuedBatch(cancelOrgId, job.id)
+    expect(cancelResult.cancelledCount).toBe(5)
+    expect((await getWallet(cancelOrgId)).balance).toBe(5)
+
+    const records = enqueueResult.items.map((item, index) => ({
+      id: item.id,
+      filename: item.filename,
+      buffer: files[index].buffer,
+    }))
+    await BatchQueueService.processBatchQueue(cancelOrgId, job.id, records)
+
+    const rows = await db.select().from(inboxItems).where(eq(inboxItems.jobId, job.id)).all()
+    expect(rows).toHaveLength(5)
+    expect(rows.every((row) => row.status === 'dismissed')).toBe(true)
+    expect((await getWallet(cancelOrgId)).balance).toBe(5)
+  })
 })

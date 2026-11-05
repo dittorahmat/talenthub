@@ -1,11 +1,11 @@
 import { db } from '../db'
 import { inboxItems, jobs, jobKnockouts, applicants } from '../db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
 import { reserveCredit, commitCredit, refundCredit, getWallet } from './walletService'
 import { evaluateResume, isCorruptedOrUnreadableBuffer } from './aiScreeningService'
 import { mockScreening, hashInt, verdictFor, rationaleFor, KEYWORD_POOL } from '../api/screening'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { contentTypeForFilename, deleteDocuments, putDocument } from './documentStorage'
 
 export interface BatchItemInput {
   filename: string
@@ -59,6 +59,10 @@ const jobBatchState = new Map<number, {
   items: Map<number, BatchProgressItem>
 }>()
 
+// One in-flight batch per tenant keeps a single tenant from saturating the
+// worker with unbounded parallel screening work.
+const activeBatchOrganizations = new Set<number>()
+
 export class BatchQueueService {
   /**
    * Check pre-flight credit balance for an organization before accepting a batch
@@ -97,6 +101,12 @@ export class BatchQueueService {
       throw new Error('No files provided in batch')
     }
 
+    if (activeBatchOrganizations.has(orgId)) {
+      const busy: any = new Error('A batch is already being processed for this organization')
+      busy.code = 'BATCH_IN_PROGRESS'
+      throw busy
+    }
+
     // 1. Pre-flight check
     const preflight = await this.checkPreFlightBalance(orgId, files.length)
     if (!preflight.allowed) {
@@ -115,8 +125,7 @@ export class BatchQueueService {
       `Reserve ${files.length} credits for batch CV upload (Job #${jobId})`
     )
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'inbox')
-    await fs.mkdir(uploadDir, { recursive: true })
+    activeBatchOrganizations.add(orgId)
 
     const queuedItems: BatchProgressItem[] = []
     const queuedRecords: { id: number; buffer: Buffer; filename: string }[] = []
@@ -124,10 +133,8 @@ export class BatchQueueService {
     for (const file of files) {
       const ext = file.filename.split('.').pop()?.toLowerCase() || 'txt'
       const sanitizedCandidateName = sanitizeName(file.filename)
-      const storedFilename = `${jobId}-${Date.now()}-${Math.abs(hashInt(file.buffer.length + file.filename.length))}.${ext}`
-      const filePath = path.join(uploadDir, storedFilename)
-      await fs.writeFile(filePath, file.buffer)
-      const fileUrl = `/uploads/inbox/${storedFilename}`
+      const storageKey = `orgs/${orgId}/jobs/${jobId}/inbox/${randomUUID()}.${ext}`
+      await putDocument(storageKey, file.buffer, contentTypeForFilename(file.filename))
 
       let extractedText = ''
       try {
@@ -136,19 +143,22 @@ export class BatchQueueService {
         extractedText = ''
       }
 
-      const emailMatch = extractedText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
-      const phoneMatch = extractedText.match(/(?:\+62|62|08)[0-9\s-]{8,14}/)
+      // Bounded scan: resume text can be megabytes, and an unbounded email
+      // pattern backtracks catastrophically on long runs of word characters.
+      const sample = extractedText.slice(0, 200_000)
+      const emailMatch = sample.match(/[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,24}/)
+      const phoneMatch = sample.match(/(?:\+62|62|08)[0-9\s-]{8,14}/)
       const extractedEmail = emailMatch ? emailMatch[0] : null
       const extractedPhone = phoneMatch ? phoneMatch[0].trim() : null
-      const keywordsArr = extractKeywords(extractedText)
+      const keywordsArr = extractKeywords(sample)
       const keywordsStr = keywordsArr.join(', ') || null
 
       const now = new Date().toISOString()
       const inserted = await db.insert(inboxItems).values({
         jobId,
         filename: file.filename,
-        filePath,
-        fileUrl,
+        filePath: storageKey,
+        fileUrl: '',
         status: 'queued',
         name: sanitizedCandidateName,
         email: extractedEmail,
@@ -220,8 +230,28 @@ export class BatchQueueService {
     const jobRow = await db.select().from(jobs).where(eq(jobs.id, jobId)).get() as any
     const jobTitle = jobRow?.title || 'Posisi Pekerjaan'
 
-    for (const item of itemsToProcess) {
-      await this.processSingleQueueItem(orgId, jobId, item.id, item.buffer, item.filename, jobTitle)
+    try {
+      for (const item of itemsToProcess) {
+        await this.processSingleQueueItem(orgId, jobId, item.id, item.buffer, item.filename, jobTitle)
+      }
+    } finally {
+      // Release per-batch state as soon as nothing is left in flight, so a
+      // long-lived instance does not accumulate progress maps for finished jobs.
+      const remaining = await db
+        .select()
+        .from(inboxItems)
+        .where(
+          and(
+            eq(inboxItems.jobId, jobId),
+            inArray(inboxItems.status, ['queued', 'extracting', 'evaluating']),
+          ),
+        )
+        .all()
+
+      if (remaining.length === 0) {
+        jobBatchState.delete(jobId)
+        activeBatchOrganizations.delete(orgId)
+      }
     }
   }
 
@@ -248,9 +278,20 @@ export class BatchQueueService {
     }
 
     try {
-      // 1. EXTRACTING
+      // 1. EXTRACTING — claim the item atomically. A cancelled (dismissed) item
+      // can no longer be claimed, so cancellation always wins the race.
+      const claimed = await db
+        .update(inboxItems)
+        .set({ status: 'extracting' })
+        .where(and(eq(inboxItems.id, itemId), eq(inboxItems.status, 'queued')))
+        .returning()
+        .all()
+
+      if (claimed.length === 0) {
+        return
+      }
+
       updateMemStatus('EXTRACTING')
-      await db.update(inboxItems).set({ status: 'extracting' }).where(eq(inboxItems.id, itemId)).run()
 
       // Small delay to simulate worker queue ingestion
       await new Promise((r) => setTimeout(r, 40))
@@ -351,24 +392,31 @@ export class BatchQueueService {
     refundedCredits: number
   }> {
     const jobState = jobBatchState.get(jobId)
-    const dbQueued = await db
-      .select()
-      .from(inboxItems)
+
+    // Atomically move only still-queued rows to dismissed. Rows already claimed
+    // by the worker (extracting/evaluating/ready/error) are never refunded.
+    const cancelledItems = await db
+      .update(inboxItems)
+      .set({
+        status: 'dismissed',
+        rationale: 'Dibatalkan oleh pengguna (kredit dikembalikan)',
+      })
       .where(and(eq(inboxItems.jobId, jobId), eq(inboxItems.status, 'queued')))
+      .returning()
       .all() as any[]
 
     let cancelledCount = 0
-    for (const item of dbQueued) {
-      await db.update(inboxItems).set({
-        status: 'dismissed',
-        rationale: 'Dibatalkan oleh pengguna (kredit dikembalikan)',
-      }).where(eq(inboxItems.id, item.id)).run()
-
+    const cancelledKeys: Array<string | null> = []
+    for (const item of cancelledItems) {
+      cancelledKeys.push(item.filePath ?? null)
       if (jobState?.items.has(item.id)) {
         jobState.items.delete(item.id)
       }
       cancelledCount++
     }
+
+    // Remove the stored files for items that will never be screened.
+    await deleteDocuments(cancelledKeys)
 
     if (cancelledCount > 0) {
       await refundCredit(
@@ -379,10 +427,43 @@ export class BatchQueueService {
       )
     }
 
+    // A batch with no remaining live items holds no work, so its state and
+    // tenant lock are released. A batch that is still processing keeps them.
+    const inFlight = await db
+      .select()
+      .from(inboxItems)
+      .where(
+        and(
+          eq(inboxItems.jobId, jobId),
+          inArray(inboxItems.status, ['queued', 'extracting', 'evaluating']),
+        ),
+      )
+      .all()
+
+    if (inFlight.length === 0) {
+      jobBatchState.delete(jobId)
+      activeBatchOrganizations.delete(orgId)
+    }
+
     return {
       cancelledCount,
       refundedCredits: cancelledCount,
     }
+  }
+
+  /**
+   * Removes stored files for a job's inbox items. Called before the job row is
+   * deleted so the objects do not outlive the tenant's access to them.
+   */
+  static async deleteJobDocuments(jobId: number): Promise<void> {
+    const items = await db
+      .select()
+      .from(inboxItems)
+      .where(eq(inboxItems.jobId, jobId))
+      .all()
+
+    await deleteDocuments(items.map((item) => item.filePath))
+    jobBatchState.delete(jobId)
   }
 
   /**

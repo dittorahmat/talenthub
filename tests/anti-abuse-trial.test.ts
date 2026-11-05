@@ -245,6 +245,49 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
     expect(d2.error).toContain('telah digunakan untuk klaim Free Trial')
   })
 
+  it('keys the trial rate limit on the platform client address', async () => {
+    const platformIp = `203.0.${100 + Math.floor(Math.random() * 100)}.${100 + Math.floor(Math.random() * 100)}`
+    const base = Date.now()
+
+    for (let i = 0; i < 3; i += 1) {
+      const res = await server.fetch(
+        new Request(`${baseUrl}/api/onboarding/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': platformIp,
+            'x-forwarded-for': `10.0.0.${i + 1}`,
+          },
+          body: JSON.stringify({
+            companyName: `PT Rate Limit ${i}`,
+            adminEmail: `hr@ratelimit-${base}-${i}.com`,
+            phoneWhatsapp: `0811${Math.floor(10000000 + Math.random() * 90000000)}`,
+          }),
+        })
+      )
+      expect(res.status).toBe(200)
+    }
+
+    const fourth = await server.fetch(
+      new Request(`${baseUrl}/api/onboarding/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': platformIp,
+          'x-forwarded-for': '10.0.0.99',
+        },
+        body: JSON.stringify({
+          companyName: 'PT Rate Limit 4',
+          adminEmail: `hr@ratelimit-${base}-4.com`,
+          phoneWhatsapp: `0812${Math.floor(10000000 + Math.random() * 90000000)}`,
+        }),
+      })
+    )
+    expect(fourth.status).toBe(400)
+    const data = (await fourth.json()) as any
+    expect(data.error).toContain('Batas pendaftaran')
+  })
+
   it('locks a claim after five wrong OTP attempts', async () => {
     const uniqueDomain = `lockout-${Date.now()}.com`
     const phone = `0877${Math.floor(10000000 + Math.random() * 90000000)}`

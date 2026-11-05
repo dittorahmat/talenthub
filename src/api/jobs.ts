@@ -3,6 +3,7 @@ import { db } from '../db'
 import { jobs, applicants } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { OrgEnv } from '../middleware/orgContext'
+import { BatchQueueService } from '../services/batchQueueService'
 
 export const jobsRouter = new Hono<OrgEnv>()
 
@@ -72,6 +73,7 @@ jobsRouter.delete('/:id', async (c) => {
     const job = await db.select().from(jobs).where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId))).get()
     if (!job) return c.notFound()
 
+    await BatchQueueService.deleteJobDocuments(id)
     await db.delete(jobs).where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId)))
     return c.json({ success: true, id })
   } catch (err: any) {

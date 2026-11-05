@@ -25,6 +25,33 @@ function hashOtp(code: string): string {
   return createHash('sha256').update(code).digest('hex')
 }
 
+/**
+ * Buckets a client address by network so a caller cannot escape the trial
+ * limiter by rotating a forwarding header. Cloudflare's platform-provided
+ * address is authoritative; a caller-supplied X-Forwarded-For is never used.
+ */
+function clientNetworkKey(c: { req: { header: (name: string) => string | undefined } }): string {
+  const platformIp = c.req.header('CF-Connecting-IP')?.trim()
+  const realIp = c.req.header('x-real-ip')?.trim()
+  const candidate = platformIp || realIp || '127.0.0.1'
+  return toNetworkKey(candidate)
+}
+
+function toNetworkKey(address: string): string {
+  if (address === '127.0.0.1' || address === '::1' || address === 'localhost') {
+    return address
+  }
+  if (address.includes(':')) {
+    const groups = address.split(':').filter(Boolean)
+    return `${groups.slice(0, 4).join(':')}::/64`
+  }
+  const octets = address.split('.')
+  if (octets.length === 4) {
+    return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`
+  }
+  return address
+}
+
 function constantTimeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   return timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'))
@@ -70,7 +97,7 @@ onboardingRouter.post('/register', async (c) => {
     }
 
     const domain = extractDomain(cleanEmail)
-    const clientIp = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || '127.0.0.1'
+    const clientIp = clientNetworkKey(c)
 
     // Check trial eligibility
     const eligibility = await canClaimTrial(domain, cleanPhone, clientIp)

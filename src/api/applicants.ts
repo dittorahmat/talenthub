@@ -4,12 +4,28 @@ import { jobs, applicants, notes, activities } from '../db/schema'
 import { eq, desc, and } from 'drizzle-orm'
 import { OrgEnv } from '../middleware/orgContext'
 import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
+import { deleteDocument, getDocument } from '../services/documentStorage'
 import crypto from 'crypto'
 
 export const applicantsRouter = new Hono<OrgEnv>()
 
 // In-memory token store for public candidate intelligence sharing
 const shareTokenStore = new Map<string, { applicantId: number; expiresAt: number }>()
+
+function safeDownloadFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document'
+}
+
+function documentResponse(document: { data: ArrayBuffer; contentType: string }, filename: string): Response {
+  return new Response(document.data, {
+    headers: {
+      'Content-Type': document.contentType,
+      'Content-Disposition': `attachment; filename="${safeDownloadFilename(filename)}"`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+}
 
 applicantsRouter.post('/:id/share-token', async (c) => {
   const orgId = c.get('orgId') || 1
@@ -54,6 +70,44 @@ applicantsRouter.get('/public/share/:token', async (c) => {
     missingSkills: missing,
     interviewQuestions: generateInterviewQuestions(missing),
   })
+})
+
+/**
+ * The share token is the only credential on this route. It resolves to exactly
+ * one applicant, so the document cannot be swapped for another tenant's file.
+ */
+applicantsRouter.get('/public/share/:token/resume', async (c) => {
+  const token = c.req.param('token')
+  const entry = shareTokenStore.get(token)
+  if (!entry || entry.expiresAt < Date.now()) {
+    return c.json({ error: 'Tautan telah kadaluarsa atau tidak valid' }, 404)
+  }
+
+  const applicant = await db.select().from(applicants).where(eq(applicants.id, entry.applicantId)).get()
+  if (!applicant || !applicant.resumePath) return c.notFound()
+
+  const document = await getDocument(applicant.resumePath)
+  if (!document) return c.notFound()
+
+  return documentResponse(document, applicant.resumeFilename || `resume-${applicant.id}`)
+})
+
+applicantsRouter.get('/:id/resume', async (c) => {
+  const orgId = c.get('orgId')
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+
+  const applicant = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+    .get()
+  if (!applicant || !applicant.resumePath) return c.notFound()
+
+  const document = await getDocument(applicant.resumePath)
+  if (!document) return c.notFound()
+
+  return documentResponse(document, applicant.resumeFilename || `resume-${id}`)
 })
 
 applicantsRouter.get('/:id/screening', async (c) => {
@@ -373,6 +427,7 @@ applicantsRouter.delete('/:id', async (c) => {
     if (!applicant) return c.notFound()
 
     await db.delete(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+    await deleteDocument(applicant.resumePath)
     return c.json({ success: true, id })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)

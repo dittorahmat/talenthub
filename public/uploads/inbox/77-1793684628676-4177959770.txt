@@ -1,4 +1,0 @@
-Siti Rahma
-Backend Developer
-Skills: Node.js, TypeScript, PostgreSQL, Docker, Redis
-Pengalaman: 4 tahun backend microservices.
