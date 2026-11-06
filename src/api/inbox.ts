@@ -2,13 +2,14 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { applicants, jobs, inboxItems, jobKnockouts, activities } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { promises as fs } from 'fs'
-import path from 'path'
 import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
 import { OrgEnv } from '../middleware/orgContext'
 import { BatchQueueService, BatchItemInput } from '../services/batchQueueService'
+import { getDocument } from '../services/documentStorage'
 
 const MAX_BYTES = 5 * 1024 * 1024
+const MAX_BATCH_FILES = 50
+const MAX_BATCH_BYTES = 25 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
 export const inboxRouter = new Hono<OrgEnv>()
@@ -28,13 +29,49 @@ function sanitizeName(filename: string): string {
     .join(' ')
 }
 
+/**
+ * Streams the request body into memory only up to `maxBytes`. The read is
+ * cancelled the moment the cap is crossed, so an oversized upload never gets
+ * fully buffered even when no `content-length` header is present.
+ */
+async function readBodyWithLimit(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+): Promise<ArrayBuffer | null> {
+  if (!body) return new ArrayBuffer(0)
+
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    merged.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return merged.buffer
+}
+
 function mapInboxRow(r: any) {
   return {
     id: r.id,
     job_id: r.jobId,
     filename: r.filename,
     file_path: r.filePath,
-    file_url: r.fileUrl,
+    file_url: r.filePath ? `/api/inbox/${r.id}/resume` : null,
     status: r.status,
     name: r.name,
     email: r.email,
@@ -106,16 +143,66 @@ inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
   return c.json(preflight)
 })
 
+inboxRouter.get('/inbox/:itemId/resume', async (c) => {
+  const orgId = c.get('orgId')
+  const itemId = parseInt(c.req.param('itemId'))
+  if (isNaN(itemId)) return c.notFound()
+
+  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get()
+  if (!item || !item.filePath) return c.notFound()
+
+  const job = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId)))
+    .get()
+  if (!job) return c.notFound()
+
+  const document = await getDocument(item.filePath)
+  if (!document) return c.notFound()
+
+  const filename = item.filename.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document'
+  return new Response(document.data, {
+    headers: {
+      'Content-Type': document.contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
+
 inboxRouter.post('/jobs/:id/inbox', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const orgId = c.get('orgId')
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
+  // Reject an oversized body before it is buffered into memory. The platform
+  // may enforce its own cap upstream, but the application must not depend on it.
+  const declaredLength = Number(c.req.header('content-length') ?? '0')
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BATCH_BYTES) {
+    return c.json({
+      error: 'PAYLOAD_TOO_LARGE',
+      message: `Ukuran unggahan melebihi batas ${Math.round(MAX_BATCH_BYTES / (1024 * 1024))} MB per permintaan.`,
+    }, 413)
+  }
+
   let formData: FormData
   try {
-    formData = await c.req.formData()
+    const rawBody = await readBodyWithLimit(c.req.raw.body, MAX_BATCH_BYTES)
+    if (rawBody === null) {
+      return c.json({
+        error: 'PAYLOAD_TOO_LARGE',
+        message: `Ukuran unggahan melebihi batas ${Math.round(MAX_BATCH_BYTES / (1024 * 1024))} MB per permintaan.`,
+      }, 413)
+    }
+    const contentType = c.req.header('content-type') ?? ''
+    if (!contentType.toLowerCase().includes('multipart/form-data')) {
+      return c.json({ error: 'Invalid form data' }, 400)
+    }
+    formData = await new Response(rawBody, { headers: { 'content-type': contentType } }).formData()
   } catch {
     return c.json({ error: 'Invalid form data' }, 400)
   }
@@ -132,6 +219,14 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
   }
 
   if (files.length === 0) return c.json({ error: 'No files provided' }, 400)
+
+  // Count is checked before any file body is read into a buffer.
+  if (files.length > MAX_BATCH_FILES) {
+    return c.json({
+      error: 'TOO_MANY_FILES',
+      message: `Maksimal ${MAX_BATCH_FILES} berkas per unggahan. Permintaan ini berisi ${files.length} berkas.`,
+    }, 413)
+  }
 
   // Pre-flight check balance for batch
   const preflight = await BatchQueueService.checkPreFlightBalance(orgId, files.length)
@@ -210,7 +305,7 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
     source: 'Inbox',
     status: 'Applied',
     resumePath: item.filePath,
-    resumeUrl: item.fileUrl,
+    resumeUrl: '',
     resumeFilename: item.filename,
     resumeKeywords: item.keywords,
     createdAt: now,
@@ -223,6 +318,11 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
     screeningMissing: null,
     screeningExpYears: null,
   }).returning().get() as any
+
+  await db
+    .update(applicants)
+    .set({ resumeUrl: `/api/applicants/${inserted.id}/resume` })
+    .where(eq(applicants.id, inserted.id))
 
   await db.insert(activities).values({
     organizationId: orgId,

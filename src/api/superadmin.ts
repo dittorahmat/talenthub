@@ -11,12 +11,6 @@ export const superadminRouter = new Hono()
  * Strict role guard: only users with role 'superadmin' can access superadmin APIs.
  */
 superadminRouter.use('*', async (c, next) => {
-  // Allow explicit bypass key only during local non-production automated testing if provided
-  const devTestingKey = c.req.header('X-Superadmin-Key')
-  if (process.env.NODE_ENV !== 'production' && devTestingKey === 'dev-bypass') {
-    return next()
-  }
-
   const auth = await getSessionFromRequest(c)
   if (!auth || auth.user.role !== 'superadmin') {
     return c.json({ error: 'Forbidden: Superadmin access required' }, 403)

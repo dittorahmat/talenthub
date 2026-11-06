@@ -3,6 +3,10 @@ import server from '../src/server'
 import { db } from '../src/db'
 import { organizations, jobs, applicants, creditWallets, creditTransactions } from '../src/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { sessionHeadersFor } from './helpers/auth'
+
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
 import { addCredit, getWallet } from '../src/services/walletService'
 
 describe('AI Screening & Credit Deduction Integration Tests', () => {
@@ -100,7 +104,7 @@ describe('AI Screening & Credit Deduction Integration Tests', () => {
 
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${zeroCandidate.id}/resume`, {
       method: 'POST',
-      headers: { 'x-organization-id': String(zeroOrgId) },
+      headers: org2Headers,
       body: form
     }))
 
@@ -122,7 +126,7 @@ describe('AI Screening & Credit Deduction Integration Tests', () => {
     // 1. Ensure org 1 has at least 5 credits
     const walletBefore = await getWallet(orgId)
     if (walletBefore.balance < 5) {
-      await addCredit(orgId, 10, 'TEST_TOPUP', 'Test setup credits')
+      await addCredit(orgId, 10, 'INITIAL_GRANT', 'Test setup credits')
     }
     const balanceBeforeDeduct = (await getWallet(orgId)).balance
 
@@ -143,7 +147,7 @@ Pengalaman:
     // 3. Make POST /api/applicants/:id/resume
     const res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${richCandidateId}/resume`, {
       method: 'POST',
-      headers: { 'x-organization-id': String(orgId) },
+      headers: org1Headers,
       body: form
     }))
 
@@ -190,7 +194,7 @@ Pengalaman:
 
   it('provides screening details via GET /api/applicants/:id/screening and GET /api/applicants/:id', async () => {
     const resScreening = await server.fetch(new Request(`http://localhost:3001/api/applicants/${richCandidateId}/screening`, {
-      headers: { 'x-organization-id': String(orgId) }
+      headers: org1Headers
     }))
     expect(resScreening.status).toBe(200)
     const screeningData = await resScreening.json()
@@ -200,7 +204,7 @@ Pengalaman:
     expect(Array.isArray(screeningData.matched)).toBe(true)
 
     const resApplicant = await server.fetch(new Request(`http://localhost:3001/api/applicants/${richCandidateId}`, {
-      headers: { 'x-organization-id': String(orgId) }
+      headers: org1Headers
     }))
     expect(resApplicant.status).toBe(200)
     const applicantData = await resApplicant.json()

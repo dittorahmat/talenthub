@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { initCloudflareD1 } from './db'
+import { initDocumentStorage } from './services/documentStorage'
+import { DEFAULT_WORKER_ORIGIN, resolveAllowedOrigins } from './config/origins'
 import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
@@ -24,10 +26,20 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.use('*', cors())
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.APP_ORIGIN, DEFAULT_WORKER_ORIGIN)
+
+app.use('*', cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+}))
 app.use('*', async (c, next) => {
   if (c.env?.DB) {
     initCloudflareD1(c.env.DB)
+  }
+  if (c.env?.CV_STORAGE) {
+    initDocumentStorage(c.env.CV_STORAGE)
   }
   await next()
 })
@@ -63,6 +75,9 @@ export default {
   async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
     if (env.DB) {
       initCloudflareD1(env.DB)
+    }
+    if (env.CV_STORAGE) {
+      initDocumentStorage(env.CV_STORAGE)
     }
     console.log(`[Cloudflare Queue Worker] Received batch of ${batch.messages.length} messages`)
     for (const message of batch.messages) {

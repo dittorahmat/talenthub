@@ -1,9 +1,29 @@
 import { Hono } from 'hono'
 import { OrgEnv } from '../middleware/orgContext'
-import { db, sqlite } from '../db'
+import { db } from '../db'
 import { paymentInvoices } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
-import { addCredit } from '../services/walletService'
+import { eq, desc, and } from 'drizzle-orm'
+import { addCredit, getWallet } from '../services/walletService'
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+const WEBHOOK_SIGNATURE_HEADER = 'x-webhook-signature'
+
+function getWebhookSecret(): string | null {
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET?.trim()
+  return secret ? secret : null
+}
+
+if (process.env.NODE_ENV === 'production' && !getWebhookSecret()) {
+  console.error('[billing] PAYMENT_WEBHOOK_SECRET is not configured. Settlement callbacks will be rejected.')
+}
+
+function isValidWebhookSignature(rawBody: string, provided: string | undefined, secret: string): boolean {
+  if (!provided) return false
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex')
+  const normalized = provided.startsWith('sha256=') ? provided.slice('sha256='.length) : provided
+  if (expected.length !== normalized.length) return false
+  return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(normalized, 'utf8'))
+}
 
 export interface CreditPackage {
   id: 'starter' | 'growth' | 'enterprise'
@@ -88,13 +108,14 @@ billingRouter.get('/invoices', async (c) => {
   return c.json({ invoices })
 })
 
-// GET /api/billing/invoice/:invoiceId - get specific invoice
+// GET /api/billing/invoice/:invoiceId - get specific invoice for the caller's organization
 billingRouter.get('/invoice/:invoiceId', async (c) => {
+  const orgId = c.get('orgId')
   const invoiceId = c.req.param('invoiceId')
   const invoice = await db
     .select()
     .from(paymentInvoices)
-    .where(eq(paymentInvoices.id, invoiceId))
+    .where(and(eq(paymentInvoices.id, invoiceId), eq(paymentInvoices.organizationId, orgId)))
     .get()
 
   if (!invoice) {
@@ -163,79 +184,103 @@ billingRouter.post('/checkout', async (c) => {
 })
 
 /**
- * Common logic to settle invoice and add credits idempotently
+ * Common logic to settle invoice and add credits idempotently.
+ *
+ * The transition PENDING -> PAID is a single conditional UPDATE, so two
+ * concurrent callbacks can never both grant credits. Only the Drizzle query
+ * builder is used, so this runs unchanged on Cloudflare D1.
  */
 async function processInvoiceSettlement(invoiceId: string) {
-  // Use a transaction on sqlite to atomically check status, update to PAID, and add credit
-  const tx = sqlite.transaction(() => {
-    // 1. Get invoice with lock semantics in sqlite
-    const invoiceStmt = sqlite.prepare(`SELECT * FROM payment_invoices WHERE id = ?`)
-    const inv = invoiceStmt.get(invoiceId) as any
+  const invoiceList = await db
+    .select()
+    .from(paymentInvoices)
+    .where(eq(paymentInvoices.id, invoiceId))
+    .all()
 
-    if (!inv) {
-      throw new Error('Invoice not found')
-    }
+  const invoice = invoiceList[0]
+  if (!invoice) {
+    throw new Error('Invoice not found')
+  }
 
-    // 2. Check idempotency: If already paid, do NOT credit again
-    if (inv.status === 'PAID') {
-      // Get current balance
-      const walletStmt = sqlite.prepare(`SELECT balance FROM credit_wallets WHERE organization_id = ?`)
-      const wallet = walletStmt.get(inv.organization_id) as any
-      return {
-        alreadyPaid: true,
-        invoice: inv,
-        balance: wallet ? wallet.balance : 0,
-      }
-    }
-
-    const nowIso = new Date().toISOString()
-
-    // 3. Update invoice status to PAID
-    const updateInvStmt = sqlite.prepare(`
-      UPDATE payment_invoices 
-      SET status = 'PAID', paid_at = ?, updated_at = ?
-      WHERE id = ?
-    `)
-    updateInvStmt.run(nowIso, nowIso, invoiceId)
-
-    return {
-      alreadyPaid: false,
-      invoice: { ...inv, status: 'PAID', paid_at: nowIso },
-    }
-  })
-
-  const txResult = tx()
-
-  if (txResult.alreadyPaid) {
+  if (invoice.status === 'PAID') {
+    const wallet = await getWallet(invoice.organizationId)
     return {
       status: 'success',
       message: 'Invoice already processed (idempotent)',
-      invoiceId: txResult.invoice.id,
-      balance: txResult.balance,
+      invoiceId: invoice.id,
+      balance: wallet.balance,
       creditsAdded: 0,
     }
   }
 
-  // 4. Add credit to wallet
+  const nowIso = new Date().toISOString()
+  const claimedInvoices = await db
+    .update(paymentInvoices)
+    .set({ status: 'PAID', paidAt: nowIso, updatedAt: nowIso })
+    .where(and(eq(paymentInvoices.id, invoiceId), eq(paymentInvoices.status, 'PENDING')))
+    .returning()
+    .all()
+
+  if (claimedInvoices.length === 0) {
+    const currentList = await db
+      .select()
+      .from(paymentInvoices)
+      .where(eq(paymentInvoices.id, invoiceId))
+      .all()
+    const current = currentList[0]
+    if (!current) {
+      throw new Error('Invoice not found')
+    }
+    if (current.status === 'PAID') {
+      const wallet = await getWallet(current.organizationId)
+      return {
+        status: 'success',
+        message: 'Invoice already processed (idempotent)',
+        invoiceId: current.id,
+        balance: wallet.balance,
+        creditsAdded: 0,
+      }
+    }
+    throw new Error(`Invoice tidak dapat diselesaikan dari status ${current.status}`)
+  }
+
+  const settledInvoice = claimedInvoices[0]
+
   const addRes = await addCredit(
-    txResult.invoice.organization_id,
-    txResult.invoice.credits,
+    settledInvoice.organizationId,
+    settledInvoice.credits,
     'PURCHASE',
-    `Pembelian paket kredit: ${txResult.invoice.package_name} (${txResult.invoice.credits} Kredit)`
+    `Pembelian paket kredit: ${settledInvoice.packageName} (${settledInvoice.credits} Kredit)`,
   )
 
   return {
     status: 'success',
-    invoiceId: txResult.invoice.id,
+    invoiceId: settledInvoice.id,
     balance: addRes.newBalance,
-    creditsAdded: txResult.invoice.credits,
+    creditsAdded: settledInvoice.credits,
     transaction: addRes.transaction,
   }
 }
 
 // POST /api/billing/webhook
 billingRouter.post('/webhook', async (c) => {
-  const payload = await c.req.json().catch(() => ({}))
+  const secret = getWebhookSecret()
+  if (!secret) {
+    return c.json({ error: 'Webhook pembayaran belum dikonfigurasi' }, 503)
+  }
+
+  const rawBody = await c.req.text()
+  const signature = c.req.header(WEBHOOK_SIGNATURE_HEADER)
+  if (!isValidWebhookSignature(rawBody, signature, secret)) {
+    return c.json({ error: 'Signature webhook tidak valid' }, 401)
+  }
+
+  let payload: Record<string, any>
+  try {
+    payload = JSON.parse(rawBody)
+  } catch {
+    return c.json({ error: 'Payload webhook tidak valid' }, 400)
+  }
 
   // Support Midtrans format (order_id, transaction_status) or Xendit format (external_id, status)
   const invoiceId = payload.order_id || payload.external_id || payload.invoiceId
@@ -254,6 +299,23 @@ billingRouter.post('/webhook', async (c) => {
   }
 
   try {
+    const invoice = await db
+      .select()
+      .from(paymentInvoices)
+      .where(eq(paymentInvoices.id, invoiceId))
+      .get()
+
+    if (!invoice) {
+      return c.json({ error: 'Invoice not found' }, 404)
+    }
+
+    if (payload.gross_amount !== undefined) {
+      const grossAmount = Number(payload.gross_amount)
+      if (!Number.isFinite(grossAmount) || Math.round(grossAmount) !== invoice.amountIdr) {
+        return c.json({ error: 'Nominal pembayaran tidak sesuai dengan invoice' }, 400)
+      }
+    }
+
     const result = await processInvoiceSettlement(invoiceId)
     return c.json(result)
   } catch (err: any) {
@@ -264,8 +326,14 @@ billingRouter.post('/webhook', async (c) => {
   }
 })
 
-// POST /api/billing/simulate-pay/:invoiceId - helper endpoint for demo/local testing
+// POST /api/billing/simulate-pay/:invoiceId
+// Local-only helper. It is disabled unless explicitly enabled, so no deployed
+// surface can mark an invoice paid without a verified provider callback.
 billingRouter.post('/simulate-pay/:invoiceId', async (c) => {
+  if (process.env.PAYMENT_SIMULATION_ENABLED !== 'true') {
+    return c.json({ error: 'Not found' }, 404)
+  }
+
   const invoiceId = c.req.param('invoiceId')
 
   try {

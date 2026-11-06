@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { OrgEnv } from '../middleware/orgContext'
-import { getWallet, getTransactions, addCredit } from '../services/walletService'
+import { getWallet, getTransactions } from '../services/walletService'
 
 export const walletRouter = new Hono<OrgEnv>()
 
@@ -23,23 +23,4 @@ walletRouter.get('/', async (c) => {
       createdAt: t.createdAt,
     })),
   })
-})
-
-// POST /api/wallet/topup (mock top up / purchase endpoint for UI and tests)
-walletRouter.post('/topup', async (c) => {
-  const orgId = c.get('orgId')
-  const body = await c.req.json().catch(() => ({}))
-  const amount = Number(body.amount) || 100
-  const description = body.description || `Top Up ${amount} Kredit`
-
-  try {
-    const result = await addCredit(orgId, amount, 'PURCHASE', description)
-    return c.json({
-      success: true,
-      balance: result.newBalance,
-      transaction: result.transaction,
-    })
-  } catch (err: any) {
-    return c.json({ error: err.message || 'Failed to top up' }, 400)
-  }
 })

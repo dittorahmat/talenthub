@@ -14,7 +14,7 @@
     "init-db": "bun run scripts/init-db.ts",
     "lint:copy": "node scripts/lint-copywriting.mjs",
     "lint:standards": "node scripts/lint-code-standards.mjs",
-    "check": "node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run",
+    "check": "node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && node scripts/verify-no-published-uploads.mjs && wrangler deploy --dry-run",
     "test": "bun test"
   },
   "dependencies": {

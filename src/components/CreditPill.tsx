@@ -10,7 +10,6 @@ export const CreditPill: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const [isTopupModalOpen, setIsTopupModalOpen] = useState<boolean>(false)
-  const [isToppingUp, setIsToppingUp] = useState<boolean>(false)
 
   const fetchWallet = async () => {
     try {
@@ -28,23 +27,11 @@ export const CreditPill: React.FC = () => {
     }
   }
 
-  const handleTopUp = async (amount: number) => {
-    try {
-      setIsToppingUp(true)
-      const res = await orgFetch('/api/wallet/topup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount }),
-      })
-      if (res.ok) {
-        await fetchWallet()
-        window.dispatchEvent(new CustomEvent('walletChanged'))
-      }
-    } catch (err) {
-      console.error('Top up error:', err)
-    } finally {
-      setIsToppingUp(false)
-    }
+  // Credits can only be granted by a verified payment settlement, so the
+  // quick-action opens the real checkout flow instead of mutating the balance.
+  const handleTopUp = async (_amount: number) => {
+    setIsModalOpen(false)
+    setIsTopupModalOpen(true)
   }
 
   useEffect(() => {
@@ -141,7 +128,7 @@ export const CreditPill: React.FC = () => {
           setIsModalOpen(false)
           setIsTopupModalOpen(true)
         }}
-        isToppingUp={isToppingUp}
+        isToppingUp={false}
       />
 
       <TopupModal

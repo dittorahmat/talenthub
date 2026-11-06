@@ -2,11 +2,11 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { applicants, activities, jobs } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { randomUUID } from 'node:crypto'
 import { OrgEnv } from '../middleware/orgContext'
 import { getWallet, reserveCredit, commitCredit, refundCredit } from '../services/walletService'
 import { evaluateResume, isCorruptedOrUnreadableBuffer } from '../services/aiScreeningService'
+import { contentTypeForFilename, deleteDocument, putDocument } from '../services/documentStorage'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
@@ -55,20 +55,18 @@ resumeRouter.post('/:id/resume', async (c) => {
       }, 402)
     }
 
-    const filename = `${id}-${Date.now()}.${ext}`
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'resumes')
-    const filePath = path.join(uploadDir, filename)
+    const filename = `${id}-${randomUUID()}.${ext}`
+    const storageKey = `orgs/${orgId}/applicants/${id}/${filename}`
+    const resumeUrl = `/api/applicants/${id}/resume`
 
-    await fs.mkdir(uploadDir, { recursive: true })
-    await fs.writeFile(filePath, buffer)
+    await putDocument(storageKey, buffer, contentTypeForFilename(file.name))
 
-    const resumeUrl = `/uploads/resumes/${filename}`
     const now = new Date().toISOString()
 
     // Mark status as processing initially
     await db.update(applicants).set({
       resumeUrl,
-      resumePath: filePath,
+      resumePath: storageKey,
       resumeFilename: file.name,
       screeningStatus: 'processing',
       screeningSummary: null,
@@ -104,7 +102,12 @@ resumeRouter.post('/:id/resume', async (c) => {
       const errorSummary = 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke saldo dompet.'
       const errorTime = new Date().toISOString()
 
+      // A corrupt upload must not linger in private storage.
+      await deleteDocument(storageKey)
+
       await db.update(applicants).set({
+        resumeUrl: null,
+        resumePath: null,
         screeningStatus: 'error',
         screeningVerdict: 'Error',
         screeningSummary: errorSummary,

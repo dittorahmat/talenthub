@@ -123,6 +123,8 @@ sqlite.exec(`
     admin_email TEXT NOT NULL,
     phone_whatsapp TEXT NOT NULL,
     otp_code TEXT,
+    otp_hash TEXT,
+    otp_attempts INTEGER NOT NULL DEFAULT 0,
     otp_expires_at TEXT,
     is_verified INTEGER NOT NULL DEFAULT 0,
     claimed_at TEXT,
@@ -179,3 +181,13 @@ sqlite.exec(`
 `)
 
 console.log('Database initialized successfully')
+
+// Idempotent column migrations for databases created before the OTP hardening.
+const trialClaimColumns = sqlite.prepare('PRAGMA table_info(trial_claims)').all() as Array<{ name: string }>
+const trialClaimColumnNames = new Set(trialClaimColumns.map((column) => column.name))
+if (!trialClaimColumnNames.has('otp_hash')) {
+  sqlite.exec('ALTER TABLE trial_claims ADD COLUMN otp_hash TEXT;')
+}
+if (!trialClaimColumnNames.has('otp_attempts')) {
+  sqlite.exec('ALTER TABLE trial_claims ADD COLUMN otp_attempts INTEGER NOT NULL DEFAULT 0;')
+}

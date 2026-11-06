@@ -36,3 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # local scratch and taste stubs
 .scratch/
 .taste-skill/
+
+# candidate documents are private, never published or committed
+public/uploads/
+data/private-documents/

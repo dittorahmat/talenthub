@@ -1,102 +1,105 @@
-import { db, sqlite } from '../src/db'
-import { organizations, jobs, applicants, notes, activities } from '../src/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { expect } from 'bun:test'
+import { db } from '../src/db'
+import { organizations, jobs, applicants } from '../src/db/schema'
+import { eq } from 'drizzle-orm'
 import server from '../src/server'
+import { sessionHeadersFor } from './helpers/auth'
 
 console.log('--- START TENANT ISOLATION TESTS ---')
 
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
+
 // 1. Check organizations seeded
 const orgs = await db.select().from(organizations).all()
-console.assert(orgs.length >= 2, 'Should have at least 2 organizations')
-console.log('Seeded Orgs:', orgs.map(o => ({ id: o.id, name: o.name, slug: o.slug })))
+expect(orgs.length).toBeGreaterThanOrEqual(2)
+console.log('Seeded Orgs:', orgs.map((o) => ({ id: o.id, name: o.name, slug: o.slug })))
 
-// 2. Test GET /api/jobs without header -> defaults to Org 1 (Tech Satu Solusi)
+// 2. Unauthenticated request must be rejected
 let res = await server.fetch(new Request('http://localhost:3001/api/jobs'))
+expect(res.status).toBe(401)
+
+// 3. Record baseline counts for each tenant
+const org1JobsBefore = await db.select().from(jobs).where(eq(jobs.organizationId, 1)).all()
+const org2JobsBefore = await db.select().from(jobs).where(eq(jobs.organizationId, 2)).all()
+
+res = await server.fetch(new Request('http://localhost:3001/api/jobs', { headers: org1Headers }))
 let data = await res.json()
-console.assert(res.status === 200, 'Jobs request without header should return 200')
-console.assert(Array.isArray(data) && data.length === 3, 'Org 1 should have 3 jobs seeded')
-console.log('Org 1 Jobs count:', data.length)
+expect(res.status).toBe(200)
+expect(data.length).toBe(org1JobsBefore.length)
 
-// 3. Test GET /api/jobs with header x-organization-id: 2 -> Org 2 should have 0 jobs
-res = await server.fetch(new Request('http://localhost:3001/api/jobs', {
-  headers: { 'x-organization-id': '2' }
-}))
+res = await server.fetch(new Request('http://localhost:3001/api/jobs', { headers: org2Headers }))
 data = await res.json()
-console.assert(res.status === 200, 'Jobs request with x-organization-id: 2 should return 200')
-console.assert(Array.isArray(data) && data.length === 0, 'Org 2 should have 0 jobs initially')
-console.log('Org 2 Jobs count (expected 0):', data.length)
+expect(res.status).toBe(200)
+expect(data.length).toBe(org2JobsBefore.length)
 
-// 4. Create a job for Org 2
+// 4. A session for Org 1 must not be able to assert Org 2 via the header
+res = await server.fetch(new Request('http://localhost:3001/api/jobs', {
+  headers: { ...org1Headers, 'x-organization-id': '2' },
+}))
+expect(res.status).toBe(403)
+
+// 5. Create a job for Org 2
 res = await server.fetch(new Request('http://localhost:3001/api/jobs', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'x-organization-id': '2'
+    ...org2Headers,
   },
   body: JSON.stringify({
     title: 'Cloud Security Architect',
     location: 'Jakarta, Indonesia',
-    remote: 'Yes'
-  })
+    remote: 'Yes',
+  }),
 }))
-console.assert(res.status === 201, 'Creating job for Org 2 should succeed')
+expect(res.status).toBe(201)
 const newJobOrg2 = await res.json()
-console.assert(newJobOrg2.organization_id === 2, 'Created job must have organization_id 2')
-console.log('Created Org 2 Job:', newJobOrg2)
+expect(newJobOrg2.organization_id).toBe(2)
 
-// 5. Verify Org 1 cannot see Org 2's new job
-res = await server.fetch(new Request('http://localhost:3001/api/jobs', {
-  headers: { 'x-organization-id': '1' }
-}))
+// 6. Verify Org 1 cannot see Org 2's new job
+res = await server.fetch(new Request('http://localhost:3001/api/jobs', { headers: org1Headers }))
 data = await res.json()
-console.assert(data.length === 3, 'Org 1 should still only see 3 jobs')
-console.assert(!data.some((j: any) => j.id === newJobOrg2.id), 'Org 1 must NOT see Org 2 job')
+expect(data.length).toBe(org1JobsBefore.length)
+expect(data.some((j: any) => j.id === newJobOrg2.id)).toBe(false)
 
-// 6. Verify Org 1 cannot access Org 2's job by ID
-res = await server.fetch(new Request(`http://localhost:3001/api/jobs/${newJobOrg2.id}`, {
-  headers: { 'x-organization-id': '1' }
-}))
-console.assert(res.status === 404, 'Org 1 accessing Org 2 job should return 404 Not Found')
+// 7. Verify Org 1 cannot access Org 2's job by ID
+res = await server.fetch(new Request(`http://localhost:3001/api/jobs/${newJobOrg2.id}`, { headers: org1Headers }))
+expect(res.status).toBe(404)
 
-// 7. Verify Org 2 CAN access its job by ID
-res = await server.fetch(new Request(`http://localhost:3001/api/jobs/${newJobOrg2.id}`, {
-  headers: { 'x-organization-id': '2' }
-}))
-console.assert(res.status === 200, 'Org 2 accessing its own job should return 200')
+// 8. Verify Org 2 CAN access its job by ID
+res = await server.fetch(new Request(`http://localhost:3001/api/jobs/${newJobOrg2.id}`, { headers: org2Headers }))
+expect(res.status).toBe(200)
 
-// 8. Create applicant in Org 2
+// 9. Create applicant in Org 2
 res = await server.fetch(new Request('http://localhost:3001/api/applicants', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'x-organization-id': '2'
+    ...org2Headers,
   },
   body: JSON.stringify({
     job_id: newJobOrg2.id,
     name: 'Budi Security',
-    email: 'budi.sec@example.com'
-  })
+    email: 'budi.sec@example.com',
+  }),
 }))
-console.assert(res.status === 201, 'Creating applicant in Org 2 should succeed')
+expect(res.status).toBe(201)
 const newAppOrg2 = await res.json()
-console.assert(newAppOrg2.organization_id === 2, 'Applicant must have organization_id 2')
+expect(newAppOrg2.organization_id).toBe(2)
 
-// 9. Verify Org 1 cannot access Org 2 applicant
-res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${newAppOrg2.id}`, {
-  headers: { 'x-organization-id': '1' }
-}))
-console.assert(res.status === 404, 'Org 1 accessing Org 2 applicant should return 404')
+// 10. Verify Org 1 cannot access Org 2 applicant
+res = await server.fetch(new Request(`http://localhost:3001/api/applicants/${newAppOrg2.id}`, { headers: org1Headers }))
+expect(res.status).toBe(404)
 
-// 10. Verify Org 1 cannot delete Org 2 job
+// 11. Verify Org 1 cannot delete Org 2 job
 res = await server.fetch(new Request(`http://localhost:3001/api/jobs/${newJobOrg2.id}`, {
   method: 'DELETE',
-  headers: { 'x-organization-id': '1' }
+  headers: org1Headers,
 }))
-console.assert(res.status === 404, 'Org 1 deleting Org 2 job should return 404')
+expect(res.status).toBe(404)
 
 // Cleanup Org 2 test job and applicant
 await db.delete(applicants).where(eq(applicants.id, newAppOrg2.id))
 await db.delete(jobs).where(eq(jobs.id, newJobOrg2.id))
 
 console.log('--- ALL TENANT ISOLATION TESTS PASSED! ---')
-process.exit(0)

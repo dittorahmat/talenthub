@@ -35,11 +35,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     }
   }
 
-  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail)
-    setPassword(demoPass)
-  }
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -159,48 +154,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             {loading ? 'Memverifikasi...' : 'Masuk ke Workspace'}
           </button>
         </form>
-
-        {/* Demo Testing Presets */}
-        <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '10px' }}>
-            Akun Percobaan Cepat (Dev / QA)
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              {
-                label: 'Tech Satu Solusi (Recruiter)',
-                email: 'recruiter@tech1solusi.com',
-                pass: 'Demo123!@#'
-              },
-              {
-                label: 'TalentHub Superadmin',
-                email: 'superadmin@talenthub.ai',
-                pass: 'Admin123!@#'
-              }
-            ].map((preset) => (
-              <button
-                key={preset.email}
-                type="button"
-                onClick={() => handleQuickLogin(preset.email, preset.pass)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: 'var(--raised)',
-                  border: '1px solid var(--border)',
-                  textAlign: 'left',
-                  fontSize: '12px',
-                  color: 'var(--text)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <span>{preset.label}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontSize: '11px' }}>Isi Otomatis</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Register & Return Link */}
         <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)' }}>

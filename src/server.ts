@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/bun'
+import { DEFAULT_DEV_ORIGIN, resolveAllowedOrigins } from './config/origins'
 import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
 import { applicantsRouter } from './api/applicants'
@@ -17,7 +18,14 @@ import { superadminRouter } from './api/superadmin'
 
 const app = new Hono()
 
-app.use('*', cors({ origin: ['http://localhost:5173'], credentials: true }))
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.APP_ORIGIN, DEFAULT_DEV_ORIGIN)
+
+app.use('*', cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+}))
 app.use('/api/*', orgMiddleware)
 
 app.get('/api/health', (c) => c.json({ status: 'ok' }))

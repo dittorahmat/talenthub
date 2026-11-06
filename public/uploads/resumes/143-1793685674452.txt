@@ -1,8 +1,0 @@
-
-Budi Santoso
-Senior Frontend React Engineer
-5 tahun pengalaman profesional di pengembangan web modern.
-Keahlian teknis: React, TypeScript, JavaScript, Node.js, Git, CI/CD, CSS.
-Pengalaman:
-- Lead Frontend Developer di Tech Indonesia (2019 - sekarang)
-- Mengembangkan aplikasi SaaS berbasis React dan TypeScript

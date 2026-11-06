@@ -8,22 +8,26 @@ export const organizationsRouter = new Hono<OrgEnv>()
 
 organizationsRouter.get('/', async (c) => {
   try {
-    const list = await db.select().from(organizations).all()
+    const orgId = c.get('orgId')
+    const list = await db.select().from(organizations).where(eq(organizations.id, orgId)).all()
+    if (list.length === 0) {
+      return c.json({ error: 'Organization not found' }, 404)
+    }
     return c.json(list)
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500)
+  } catch {
+    return c.json({ error: 'Gagal memuat organisasi' }, 500)
   }
 })
 
 organizationsRouter.get('/current', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const orgId = c.get('orgId')
     const org = await db.select().from(organizations).where(eq(organizations.id, orgId)).get()
     if (!org) {
       return c.json({ error: 'Organization not found' }, 404)
     }
     return c.json(org)
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500)
+  } catch {
+    return c.json({ error: 'Gagal memuat organisasi' }, 500)
   }
 })

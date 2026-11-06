@@ -68,6 +68,9 @@ export default function App() {
     try {
       await fetch('/api/auth/sign-out', { method: 'POST' })
     } catch {}
+    try {
+      localStorage.removeItem('talenthub_active_org_id')
+    } catch {}
     setCurrentUser(null)
     window.location.hash = '#/'
   }

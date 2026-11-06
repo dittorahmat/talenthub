@@ -4,6 +4,10 @@ import { getWallet, deductCredit, addCredit, getTransactions } from '../src/serv
 import { db } from '../src/db'
 import { creditWallets, creditTransactions, organizations } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
+import { sessionHeadersFor } from './helpers/auth'
+
+const org1Headers = await sessionHeadersFor(1)
+const org2Headers = await sessionHeadersFor(2)
 
 describe('Credit Wallet & Ledger Tests', () => {
   beforeAll(async () => {
@@ -21,7 +25,7 @@ describe('Credit Wallet & Ledger Tests', () => {
   it('reads wallet balance per tenant via API GET /api/wallet', async () => {
     // Org 1 (Tech Satu Solusi)
     const res1 = await server.fetch(new Request('http://localhost:3001/api/wallet', {
-      headers: { 'x-organization-id': '1' }
+      headers: org1Headers,
     }))
     expect(res1.status).toBe(200)
     const data1 = await res1.json()
@@ -31,7 +35,7 @@ describe('Credit Wallet & Ledger Tests', () => {
 
     // Org 2 (PT Sirius Global Technologies)
     const res2 = await server.fetch(new Request('http://localhost:3001/api/wallet', {
-      headers: { 'x-organization-id': '2' }
+      headers: org2Headers
     }))
     expect(res2.status).toBe(200)
     const data2 = await res2.json()
@@ -89,24 +93,25 @@ describe('Credit Wallet & Ledger Tests', () => {
 
     // Verify GET /api/wallet reflects addition
     const res = await server.fetch(new Request('http://localhost:3001/api/wallet', {
-      headers: { 'x-organization-id': '1' }
+      headers: org1Headers,
     }))
     const data = await res.json()
     expect(data.balance).toBe(initialBalance + 100)
   })
 
-  it('supports mock topup API endpoint POST /api/wallet/topup', async () => {
+  it('rejects the removed direct top-up endpoint and leaves the balance unchanged', async () => {
+    const walletBefore = await getWallet(2)
     const res = await server.fetch(new Request('http://localhost:3001/api/wallet/topup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-organization-id': '2',
+        ...org2Headers,
       },
       body: JSON.stringify({ amount: 50, description: 'Test Topup 50' }),
     }))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.success).toBe(true)
-    expect(data.transaction.amount).toBe(50)
+    expect(res.status).toBe(404)
+
+    const walletAfter = await getWallet(2)
+    expect(walletAfter.balance).toBe(walletBefore.balance)
   })
 })
