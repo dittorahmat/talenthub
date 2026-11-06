@@ -263,28 +263,33 @@ export function evaluateWithSmartHeuristics(
   const experienceScore = Math.round(expRatio * 30)
 
   // Supporting factors (education, certifications, portfolios) up to 20 points
-  let supportingFactorsScore = 10 // baseline
-  if (
+  let supportingFactorsScore = 0
+  const hasDegree =
     lowerText.includes('sarjana') ||
     lowerText.includes('bachelor') ||
     lowerText.includes('s1') ||
     lowerText.includes('s2') ||
     lowerText.includes('master') ||
-    lowerText.includes('degree') ||
+    lowerText.includes('diploma') ||
+    lowerText.includes('degree')
+  const hasCertOrPortfolio =
     lowerText.includes('certified') ||
     lowerText.includes('sertifikasi') ||
     lowerText.includes('aws certified') ||
+    lowerText.includes('gcp certified') ||
     lowerText.includes('github.com') ||
-    lowerText.includes('portfolio')
-  ) {
+    lowerText.includes('gitlab.com') ||
+    lowerText.includes('portfolio') ||
+    lowerText.includes('portofolio')
+
+  if (hasDegree && hasCertOrPortfolio) {
     supportingFactorsScore = 20
+  } else if (hasDegree || hasCertOrPortfolio) {
+    supportingFactorsScore = 12
   }
 
   // Calculate composite score (0-100)
-  let rawScore = skillMatchScore + experienceScore + supportingFactorsScore
-  if (matchedSkills.length === 0) {
-    rawScore = Math.min(rawScore, 40)
-  }
+  const rawScore = skillMatchScore + experienceScore + supportingFactorsScore
   const score = Math.max(0, Math.min(100, rawScore))
 
   const band = (bandFor(score) as 'Strong' | 'Potential' | 'Weak')

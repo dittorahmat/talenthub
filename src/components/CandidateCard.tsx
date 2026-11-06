@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { EyeIcon, EditIcon, WhatsAppIcon, TrashIcon } from './Icons'
+import { buildWhatsAppUrl, buildEmailMailtoUrl } from '../utils/outreach'
 
 export interface Candidate {
   id: number
@@ -25,6 +26,7 @@ export interface Candidate {
 
 interface CandidateCardProps {
   candidate: Candidate
+  jobTitle?: string
   stages: string[]
   onSelect: (candidate: Candidate) => void
   onStatusChange: (id: number, newStatus: string) => void
@@ -45,6 +47,7 @@ function timeAgo(dateStr: string): string {
 
 export const CandidateCard: React.FC<CandidateCardProps> = ({
   candidate,
+  jobTitle,
   stages,
   onSelect,
   onStatusChange,
@@ -116,16 +119,22 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation()
-    let raw = (candidate.phone || '').replace(/[^\d+]/g, '')
-    if (raw.startsWith('08')) {
-      raw = '628' + raw.slice(2)
-    } else if (raw.startsWith('+62')) {
-      raw = raw.slice(1)
-    } else if (raw.startsWith('8')) {
-      raw = '62' + raw
-    }
-    const msg = `Halo ${candidate.name}, kami dari tim rekrutmen tertarik dengan profil dan hasil evaluasi CV Anda di TalentHub. Kapan waktu luang Anda untuk tahapan wawancara?`
-    window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, '_blank')
+    const url = buildWhatsAppUrl({
+      phone: candidate.phone,
+      candidateName: candidate.name,
+      jobTitle,
+    })
+    window.open(url, '_blank')
+  }
+
+  const handleEmail = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const url = buildEmailMailtoUrl({
+      email: candidate.email,
+      candidateName: candidate.name,
+      jobTitle,
+    })
+    window.location.href = url
   }
 
   return (
@@ -347,7 +356,7 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           {/* WhatsApp button */}
           <button
             type="button"
-            title="Kirim Pengingat WhatsApp"
+            title="Kirim Pesan WhatsApp"
             aria-label={`Kirim WhatsApp ke ${candidate.name}`}
             onClick={handleWhatsApp}
             style={{
@@ -362,6 +371,29 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
             }}
           >
             <WhatsAppIcon size={14} color="#16A34A" />
+          </button>
+
+          {/* Email button */}
+          <button
+            type="button"
+            title="Kirim Email"
+            aria-label={`Kirim email ke ${candidate.name}`}
+            onClick={handleEmail}
+            style={{
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="20" height="16" x="2" y="4" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
           </button>
 
           {/* Delete button */}

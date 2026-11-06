@@ -57,7 +57,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
       .then(res => res.json() as Promise<any>)
       .then(data => {
         setJob(data)
-        setCandidates(data.applicants || [])
+        const rawApplicants: Candidate[] = data.applicants || []
+        // Sort candidates by screening score descending (auto-ranking)
+        const sorted = [...rawApplicants].sort((a, b) => {
+          const scoreA = typeof a.screening_score === 'number' ? a.screening_score : -1
+          const scoreB = typeof b.screening_score === 'number' ? b.screening_score : -1
+          return scoreB - scoreA
+        })
+        setCandidates(sorted)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -291,6 +298,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
                     key={stage}
                     stage={stage}
                     candidates={columnCandidates}
+                    jobTitle={job?.title}
                     stages={STAGES}
                     isLastStage={idx === STAGES.length - 1}
                     onAddCandidateClick={() => setShowAddModal(true)}

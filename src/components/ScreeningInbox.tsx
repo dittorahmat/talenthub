@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { orgFetch } from '../context/OrgContext'
+import { validateResumeFile } from '../utils/outreach'
 
 export interface InboxItem {
   id: number | string
@@ -165,22 +166,16 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     if (rawArr.length === 0) return
     setUploadError(null)
 
-    // Check for legacy .doc files
-    const hasDoc = rawArr.some(f => f.name.toLowerCase().endsWith('.doc'))
-    if (hasDoc) {
-      setUploadError('Format .doc lama tidak didukung. Mohon simpan ulang berkas sebagai .docx atau .pdf sebelum diunggah.')
-      return
+    // Validate files using shared helper
+    for (const f of rawArr) {
+      const v = validateResumeFile(f)
+      if (!v.valid) {
+        setUploadError(v.error || 'Berkas tidak valid')
+        return
+      }
     }
 
-    const arr = rawArr.filter(f => {
-      const ext = f.name.split('.').pop()?.toLowerCase()
-      return ['pdf', 'docx', 'txt'].includes(ext || '')
-    })
-
-    if (arr.length === 0) {
-      setUploadError('Hanya format file .pdf, .docx, atau .txt yang didukung.')
-      return
-    }
+    const arr = rawArr
 
     // Pre-flight check via API before accepting
     try {
