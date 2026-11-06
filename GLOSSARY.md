@@ -44,15 +44,28 @@ Posisi yang dibuka oleh recruiter dalam suatu Organization, berisi deskripsi, ku
 Profil pelamar individual yang memiliki metadata kontak, riwayat pekerjaan, keterampilan, dan dokumen CV.
 
 ### Resume Document (Dokumen CV)
-File mentah (PDF/DOCX) yang disimpan di secure object storage (Cloudflare R2/S3). Akses read dibatasi via short-lived presigned URL.
+File dokumen pelamar dalam format `.pdf`, `.docx`, atau `.txt` yang disimpan di Cloudflare R2. Format legacy `.doc` ditolak di layer validasi awal dengan pesan panduan konversi ke `.docx`. Akses dokumen dibatasi melalui short-lived signed URL.
+
+### Candidate Score (Skor Kecocokan)
+Nilai numerik komposit skala 0–100 yang merefleksikan tingkat kecocokan profil kandidat terhadap kriteria Job Posting:
+- **Skill Match (50%)**: Rasio keterampilan kandidat terhadap kualifikasi wajib/opsional posisi.
+- **Experience Relevance (30%)**: Relevansi posisi terdahulu dan total tahun pengalaman kerja.
+- **Supporting Factors (20%)**: Nilai tambah dari latar belakang pendidikan, sertifikasi, atau portofolio relevan.
 
 ### AI CV Screening
-Proses otomatis ekstraksi data (OCR/text extraction) yang dievaluasi menggunakan LLM terstruktur untuk menghasilkan:
-- `summary`: Ringkasan profil kandidat.
-- `matchedSkills`: Daftar skill yang sesuai kebutuhan Job.
-- `missingSkills`: Gap skill yang belum terpenuhi.
+Proses otomatis ekstraksi teks dan analisis semantik kandidat terhadap posisi lowongan, menghasilkan:
 - `score`: Nilai kecocokan (0 - 100).
+- `matchedSkills`: Daftar keterampilan/poin plus kecocokan.
+- `missingSkills`: Kesenjangan keterampilan terhadap kebutuhan lowongan.
+- `summary`: Ringkasan naratif kecocokan dan pertimbangan teknis.
+- `band`: Kategori kecocokan (`Strong`, `Potential`, `Weak`).
 - `verdict`: Rekomendasi sistem (`Hire`, `Consider`, `Pass`).
+
+### Bulk Resume Ingestion
+Alur unggah massal multi-file CV (PDF, DOCX, TXT) sekaligus ke antrean Cloudflare Queue dengan estimasi saldo kredit sebelum proses dimulai, otomatisasi debit/refund, dan penataan peringkat hasil (*ranking*) terurut dari skor tertinggi.
+
+### One-Click Candidate Outreach
+Fitur interaksi langsung recruiter ke kandidat dengan satu klik melalui tautan resmi WhatsApp Web (`https://wa.me/<nomor>?text=...`) dan email (`mailto:<email>?subject=...`).
 
 ### Knockout Question
 Pertanyaan filter penentu kualifikasi mendasar (misal: "Apakah bersedia ditempatkan di Jakarta?"). Jawaban negatif langsung memicu auto-disqualify.

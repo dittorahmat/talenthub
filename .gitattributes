@@ -1,3 +1,4 @@
+# Set default line endings to LF for all repository text files to avoid CRLF mismatch in editing tools
 * text=auto eol=lf
 *.ts text eol=lf
 *.tsx text eol=lf
@@ -5,6 +6,5 @@
 *.mjs text eol=lf
 *.json text eol=lf
 *.jsonc text eol=lf
-*.css text eol=lf
-*.html text eol=lf
 *.md text eol=lf
+*.css text eol=lf

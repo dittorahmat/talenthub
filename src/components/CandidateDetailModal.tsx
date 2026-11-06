@@ -4,6 +4,7 @@ import { Candidate } from './CandidateCard'
 import { FileIcon, NoteIcon, ClockIcon, WhatsAppIcon } from './Icons'
 import { Candidate1PageSummaryModal } from './Candidate1PageSummaryModal'
 import { formatWhatsAppSummary, generateInterviewQuestions } from '../utils/summaryExport'
+import { buildWhatsAppUrl, buildEmailMailtoUrl } from '../utils/outreach'
 
 interface Note {
   id: number
@@ -137,9 +138,12 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   }
 
   const handleWhatsApp = () => {
-    const cleanPhone = (candidate.phone || '').replace(/[\s\-+]/g, '')
-    const msg = `Halo ${candidate.name}, ini pengingat interview Anda di TalentHub. Silakan konfirmasi kehadirannya.`
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+    const url = buildWhatsAppUrl({
+      phone: candidate.phone,
+      candidateName: candidate.name,
+      jobTitle: details?.job?.title,
+    })
+    window.open(url, '_blank')
   }
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -405,6 +409,16 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
               >
                 <WhatsAppIcon size={14} color="white" /> WhatsApp
               </button>
+              <a
+                href={buildEmailMailtoUrl({
+                  email: candidate.email,
+                  candidateName: candidate.name,
+                  jobTitle: details?.job?.title,
+                })}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
+              >
+                Kirim Email
+              </a>
               {stages.indexOf(candidate.status) < stages.length - 1 && (
                 <button
                   type="button"

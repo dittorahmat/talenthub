@@ -66,6 +66,11 @@
   - **Side-Effect Free Controls**: Tombol utilitas pembantu input form (seperti tombol Quick Presets angka `+50`, `+100`, dsb.) hanya bertugas mempopulasi/mengisi nilai input form secara reaktif; DILARANG memicu mutasi data / auto-submit ke backend secara implisit tanpa penekanan tombol submit/eksekusi utama oleh pengguna.
 - **Anti-Generic AI Slop**: Dilarang menggunakan generic AI templates (seperti teks headline 3 baris rata tengah seragam tanpa hierarki, badge hiasan tanpa fungsi, card berulang dengan background gradient pelangi murahan, border tebal tak beraturan, atau floating glowing blur berlebihan).
   - **Zero Decorative Emojis**: Dilarang menggunakan emoji dekoratif sebagai elemen UI (seperti `🛡️`, `🔒`, `⚡`, `🏢`, `🔄`, `✕`, `⚠`, `📱`, `🏦`) di tombol, header, kartu paket, modal, maupun judul halaman. Selalu gunakan ikon SVG monokrom semantik atau tipografi tegas.
+  - **No New Inline Styles on Added Elements**: Elemen antarmuka baru (tombol, tautan, teks keterangan, dsb.) WAJIB menggunakan utility classes Tailwind v4 (misal: `className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold..."`) dan DILARANG menambah inline style soup baru (`style={{ ... }}`).
+  - **Reusable Domain Helpers & Zero URL Slicing in Components**: Logika normalisasi string domain (seperti normalisasi nomor telepon ke format E.164) dan konstruksi tautan eksternal (`https://wa.me/...`, `mailto:...`) WAJIB diekstrak ke utility helper terpusat (`src/utils/outreach.ts`); dilarang melakukan regex sanitasi atau string slicing URL berulang secara ad-hoc di level komponen view.
+  - **Objective Scoring & Pure Metric Weighting**:
+    - Formula penilaian skor CV wajib mematuhi bobot ADR secara objektif (Skill 50%, Experience 30%, Supporting Factors 20%). DILARANG memberikan nilai gratis/baseline cuma-cuma pada pilar kualifikasi jika kandidat tidak terbukti memiliki riwayat kualifikasi tersebut.
+    - DILARANG menambahkan clamping/capping artifisial tanpa kesepakatan spesifikasi ADR.
   - **No AI Default Colors**: Dilarang keras menggunakan palet warna ungu/indigo instan bawaan template AI (misal `#6366F1`, `bg-indigo-50`, `border-indigo-200`) atau efek gradien murahan (`linear-gradient`) pada kartu dan modal. Seluruh aplikasi wajib patuh pada palet Light Slate & Teal semantik yang harmonis dengan Homepage.
   - **Automated Anti-Slop Enforcement**: Skrip `scripts/lint-code-standards.mjs` secara ketat memindai seluruh direktori `src/` (komponen dan halaman) dari emoji dekoratif dan warna AI default. Pelanggaran akan membatalkan build dan pre-commit check secara otomatis.
 - **Spec Delivery Completeness**: Saat mengerjakan tiket vertikal (`/implement-spec` atau restyle tiket), agen WAJIB mengaudit `git diff --stat` terhadap setiap file yang disebutkan dalam kriteria penerimaan tiket (Acceptance Criteria). Dilarang menandai pekerjaan selesai jika ada target file dari tiket yang belum disentuh.
@@ -80,6 +85,9 @@
 - **Scope Discipline & Test Fixtures**:
   - Hindari menanam credential rahasia/password sembarangan di komponen produksi; gunakan konfigurasi yang jelas atau helper testing yang aman.
   - Setiap rencana pemecahan tiket vertikal wajib diselesaikan secara menyeluruh di seluruh target komponen sebelum menandai selesai.
+  - **Consumer Views Parity**: Saat mengimplementasikan fitur data (seperti ranking skor atau penyaringan), agen wajib mengaudit seluruh komponen UI konsumen (misal: `ScreeningInbox` DAN `KanbanBoard`) agar tidak terjadi disparitas perilaku antar-halaman.
+- **Line Ending & File Editing Economy (LF Mandatory)**:
+  - Seluruh file teks repositori dikonfigurasi menggunakan LF (`.gitattributes`). Dilarang mencampuradukkan CRLF dan LF agar tool modifikasi file (`edit_file`) bekerja secara deterministik.
 - **Pre-Commit Automated Guardrails**:
   - Repositori dilengkapi git pre-commit hook (`.git/hooks/pre-commit`) yang otomatis mengeksekusi `bun run check` dan `bun run test`.
   - Agen dilarang melewati hook ini (`--no-verify`). Setiap kegagalan kompilasi TypeScript atau suite tes wajib diperbaiki sebelum commit dapat diterima.

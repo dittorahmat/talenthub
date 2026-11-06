@@ -39,6 +39,19 @@ scanDirectory(join(process.cwd(), 'src'), (filePath) => {
         reason: `AI Slop Color Palette (Purple/Indigo default) detected in ${relPath}. Wajib gunakan Light Slate & Teal.`
       })
     }
+    // Check for inline style usage in newly introduced or refactored components
+    if (
+      (relPath.includes('CandidateCard.tsx') ||
+       relPath.includes('AddCandidateForm.tsx') ||
+       relPath.includes('ScreeningInbox.tsx')) &&
+      /<(a|button)\b[^>]*\bstyle=\{\{/i.test(line)
+    ) {
+      VIOLATIONS.push({
+        file: filePath,
+        line: idx + 1,
+        reason: `Inline style soup detected on interactive element in ${relPath}. Wajib gunakan utility classes Tailwind v4.`
+      })
+    }
   })
 })
 

@@ -6,6 +6,7 @@ import { CandidateCard, Candidate } from './CandidateCard'
 interface StageColumnProps {
   stage: string
   candidates: Candidate[]
+  jobTitle?: string
   stages: string[]
   isLastStage: boolean
   onAddCandidateClick?: () => void
@@ -17,6 +18,7 @@ interface StageColumnProps {
 export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
   candidates,
+  jobTitle,
   stages,
   isLastStage,
   onAddCandidateClick,
@@ -100,6 +102,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
             <CandidateCard
               key={candidate.id}
               candidate={candidate}
+              jobTitle={jobTitle}
               stages={stages}
               onSelect={onSelectCandidate}
               onStatusChange={onStatusChange}

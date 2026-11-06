@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { orgFetch } from '../context/OrgContext'
+import { validateResumeFile } from '../utils/outreach'
 
 export interface InboxItem {
   id: number | string
@@ -94,7 +95,12 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       const data = (await res.json() as any)
       // defensive shape handling
       const rawItems: InboxItem[] = Array.isArray(data) ? data : data.items || data.data || []
-      setItems(Array.isArray(rawItems) ? rawItems : [])
+      const sorted = (Array.isArray(rawItems) ? [...rawItems] : []).sort((a, b) => {
+        const scoreA = typeof a.score === 'number' ? a.score : -1
+        const scoreB = typeof b.score === 'number' ? b.score : -1
+        return scoreB - scoreA
+      })
+      setItems(sorted)
       const rawKOs = data.knockouts || data.knockoutQuestions || []
       if (Array.isArray(rawKOs)) setKnockouts(rawKOs)
       setError(null)
@@ -156,9 +162,20 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
   const [showPreflightModal, setShowPreflightModal] = useState(false)
 
   const handleFiles = async (files: FileList | File[]) => {
-    const arr = Array.from(files)
-    if (arr.length === 0) return
+    const rawArr = Array.from(files)
+    if (rawArr.length === 0) return
     setUploadError(null)
+
+    // Validate files using shared helper
+    for (const f of rawArr) {
+      const v = validateResumeFile(f)
+      if (!v.valid) {
+        setUploadError(v.error || 'Berkas tidak valid')
+        return
+      }
+    }
+
+    const arr = rawArr
 
     // Pre-flight check via API before accepting
     try {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { orgFetch } from '../context/OrgContext'
+import { validateResumeFile } from '../utils/outreach'
 
 interface AddCandidateFormProps {
   jobId: number
@@ -31,13 +32,11 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const file = e.target.files[0]
-      const ext = file.name.split('.').pop()?.toLowerCase()
-      if (!['pdf', 'docx', 'doc'].includes(ext || '')) {
-        setError('Format berkas harus berupa PDF atau DOCX')
-        return
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Ukuran berkas maksimal 5MB')
+      const validation = validateResumeFile(file)
+      if (!validation.valid) {
+        setError(validation.error || 'Berkas tidak valid')
+        setResumeFile(null)
+        e.target.value = ''
         return
       }
       setError(null)
@@ -226,14 +225,17 @@ export const AddCandidateForm: React.FC<AddCandidateFormProps> = ({
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              Upload Resume / CV (PDF atau DOCX)
+              Upload Resume / CV (PDF, DOCX, atau TXT)
             </label>
             <input
               type="file"
-              accept=".pdf,.docx,.doc"
+              accept=".pdf,.docx,.txt"
               onChange={handleFileChange}
               style={{ fontSize: '13px' }}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Format didukung: PDF, DOCX, TXT. Format .doc lama tidak didukung.
+            </p>
           </div>
 
           <div>
