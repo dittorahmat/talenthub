@@ -137,9 +137,17 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   }
 
   const handleWhatsApp = () => {
-    const cleanPhone = (candidate.phone || '').replace(/[\s\-+]/g, '')
-    const msg = `Halo ${candidate.name}, ini pengingat interview Anda di TalentHub. Silakan konfirmasi kehadirannya.`
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+    let raw = (candidate.phone || '').replace(/[^\d+]/g, '')
+    if (raw.startsWith('08')) {
+      raw = '628' + raw.slice(2)
+    } else if (raw.startsWith('+62')) {
+      raw = raw.slice(1)
+    } else if (raw.startsWith('8')) {
+      raw = '62' + raw
+    }
+    const role = details?.job?.title || 'posisi terkait'
+    const msg = `Halo ${candidate.name}, kami dari tim rekrutmen telah mereview CV Anda untuk posisi ${role} di TalentHub dan tertarik untuk mengundang Anda ke tahap wawancara. Kapan waktu luang Anda?`
+    window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -405,6 +413,24 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
               >
                 <WhatsAppIcon size={14} color="white" /> WhatsApp
               </button>
+              <a
+                href={`mailto:${candidate.email}?subject=${encodeURIComponent(`Proses Rekrutmen: ${details?.job?.title || 'Lamaran Kerja'}`)}&body=${encodeURIComponent(`Halo ${candidate.name},\n\nTerima kasih atas ketertarikan Anda untuk bergabung bersama kami. Kami telah meninjau CV Anda dan ingin mengundang Anda ke tahapan proses selanjutnya.\n\nSalam,\nTim Rekrutmen`)}`}
+                style={{
+                  background: 'white',
+                  color: '#334155',
+                  border: '1px solid #CBD5E1',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                Kirim Email
+              </a>
               {stages.indexOf(candidate.status) < stages.length - 1 && (
                 <button
                   type="button"

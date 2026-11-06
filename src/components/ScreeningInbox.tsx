@@ -94,7 +94,12 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       const data = (await res.json() as any)
       // defensive shape handling
       const rawItems: InboxItem[] = Array.isArray(data) ? data : data.items || data.data || []
-      setItems(Array.isArray(rawItems) ? rawItems : [])
+      const sorted = (Array.isArray(rawItems) ? [...rawItems] : []).sort((a, b) => {
+        const scoreA = typeof a.score === 'number' ? a.score : -1
+        const scoreB = typeof b.score === 'number' ? b.score : -1
+        return scoreB - scoreA
+      })
+      setItems(sorted)
       const rawKOs = data.knockouts || data.knockoutQuestions || []
       if (Array.isArray(rawKOs)) setKnockouts(rawKOs)
       setError(null)
@@ -156,9 +161,26 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
   const [showPreflightModal, setShowPreflightModal] = useState(false)
 
   const handleFiles = async (files: FileList | File[]) => {
-    const arr = Array.from(files)
-    if (arr.length === 0) return
+    const rawArr = Array.from(files)
+    if (rawArr.length === 0) return
     setUploadError(null)
+
+    // Check for legacy .doc files
+    const hasDoc = rawArr.some(f => f.name.toLowerCase().endsWith('.doc'))
+    if (hasDoc) {
+      setUploadError('Format .doc lama tidak didukung. Mohon simpan ulang berkas sebagai .docx atau .pdf sebelum diunggah.')
+      return
+    }
+
+    const arr = rawArr.filter(f => {
+      const ext = f.name.split('.').pop()?.toLowerCase()
+      return ['pdf', 'docx', 'txt'].includes(ext || '')
+    })
+
+    if (arr.length === 0) {
+      setUploadError('Hanya format file .pdf, .docx, atau .txt yang didukung.')
+      return
+    }
 
     // Pre-flight check via API before accepting
     try {

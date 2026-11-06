@@ -1,3 +1,4 @@
+import { unzipSync } from 'fflate'
 import { bandFor, verdictFor, KEYWORD_POOL } from '../api/screening'
 
 export interface AIEvaluationResult {
@@ -9,6 +10,11 @@ export interface AIEvaluationResult {
   verdict: 'Hire' | 'Consider' | 'Pass'
   band: 'Strong' | 'Potential' | 'Weak'
   provider: 'smart-heuristic' | 'gemini' | 'openai'
+  scoreBreakdown?: {
+    skillMatchScore: number
+    experienceScore: number
+    supportingFactorsScore: number
+  }
 }
 
 export interface EvaluateResumeOptions {
@@ -56,7 +62,12 @@ export function isCorruptedOrUnreadableBuffer(buffer: Buffer, filename?: string)
     }
   }
 
-  const extracted = extractTextFromBuffer(buffer).trim()
+  // Reject legacy .doc or explicitly unsupported files
+  if (lowerName.endsWith('.doc')) {
+    return true
+  }
+
+  const extracted = extractTextFromBuffer(buffer, filename).trim()
   if (extracted.length === 0) {
     return true
   }
@@ -65,9 +76,38 @@ export function isCorruptedOrUnreadableBuffer(buffer: Buffer, filename?: string)
 }
 
 /**
- * Extracts raw textual content from buffer (PDF or text) or string.
+ * Extracts raw textual content from buffer (PDF, DOCX, or text/plain).
  */
-export function extractTextFromBuffer(buffer: Buffer): string {
+export function extractTextFromBuffer(buffer: Buffer, filename?: string): string {
+  const lowerName = (filename || '').toLowerCase()
+
+  // 1. DOCX Handling (ZIP containing word/document.xml)
+  // PK zip magic header: 0x50 0x4B 0x03 0x04
+  const isZip = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b
+  if (lowerName.endsWith('.docx') || isZip) {
+    try {
+      const unzipped = unzipSync(new Uint8Array(buffer))
+      const docXmlBytes = unzipped['word/document.xml']
+      if (docXmlBytes) {
+        const xmlStr = new TextDecoder('utf-8').decode(docXmlBytes)
+        // Extract inner text from XML tags <w:t>...</w:t>
+        const textNodes: string[] = []
+        const regex = /<w:t(?:\s+[^>]*)?>([^<]*)<\/w:t>/g
+        let match: RegExpExecArray | null
+        while ((match = regex.exec(xmlStr)) !== null) {
+          if (match[1]) {
+            textNodes.push(match[1])
+          }
+        }
+        if (textNodes.length > 0) {
+          return textNodes.join(' ')
+        }
+      }
+    } catch {
+      // If not a valid zip or corrupted docx, fall through
+    }
+  }
+
   const rawStr = buffer.toString('utf-8')
 
   // Check if buffer is PDF
@@ -213,16 +253,39 @@ export function evaluateWithSmartHeuristics(
     }
   }
 
-  // 4. Calculate score
-  const skillsRatio = reqSkills.length === 0 ? 1 : matchedSkills.filter(m => reqSkills.some(r => r.toLowerCase() === m.toLowerCase())).length / reqSkills.length
-  const expRatio = Math.min(1, expYears / 5) // 5+ years = full exp points
-  
-  // Base score 40 + up to 45 for skills + up to 15 for exp
-  let rawScore = Math.round(35 + (skillsRatio * 45) + (expRatio * 20))
-  if (matchedSkills.length === 0) {
-    rawScore = Math.min(rawScore, 45)
+  // 4. Composite Score Breakdown (Skill 50%, Experience 30%, Supporting Factors 20%)
+  const matchedRequiredCount = reqSkills.length === 0 ? matchedSkills.length : matchedSkills.filter(m => reqSkills.some(r => r.toLowerCase() === m.toLowerCase())).length
+  const skillsRatio = reqSkills.length === 0 ? 1 : matchedRequiredCount / reqSkills.length
+  const skillMatchScore = Math.round(skillsRatio * 50)
+
+  // Experience calculation (up to 30 points, 5+ years = full points)
+  const expRatio = Math.min(1, expYears / 5)
+  const experienceScore = Math.round(expRatio * 30)
+
+  // Supporting factors (education, certifications, portfolios) up to 20 points
+  let supportingFactorsScore = 10 // baseline
+  if (
+    lowerText.includes('sarjana') ||
+    lowerText.includes('bachelor') ||
+    lowerText.includes('s1') ||
+    lowerText.includes('s2') ||
+    lowerText.includes('master') ||
+    lowerText.includes('degree') ||
+    lowerText.includes('certified') ||
+    lowerText.includes('sertifikasi') ||
+    lowerText.includes('aws certified') ||
+    lowerText.includes('github.com') ||
+    lowerText.includes('portfolio')
+  ) {
+    supportingFactorsScore = 20
   }
-  const score = Math.max(10, Math.min(98, rawScore))
+
+  // Calculate composite score (0-100)
+  let rawScore = skillMatchScore + experienceScore + supportingFactorsScore
+  if (matchedSkills.length === 0) {
+    rawScore = Math.min(rawScore, 40)
+  }
+  const score = Math.max(0, Math.min(100, rawScore))
 
   const band = (bandFor(score) as 'Strong' | 'Potential' | 'Weak')
   const verdict = (verdictFor(band) as 'Hire' | 'Consider' | 'Pass')
@@ -244,7 +307,12 @@ export function evaluateWithSmartHeuristics(
     expYears,
     verdict,
     band,
-    provider: 'smart-heuristic'
+    provider: 'smart-heuristic',
+    scoreBreakdown: {
+      skillMatchScore,
+      experienceScore,
+      supportingFactorsScore
+    }
   }
 }
 

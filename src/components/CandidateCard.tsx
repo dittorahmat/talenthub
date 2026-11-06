@@ -116,9 +116,16 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const cleanPhone = (candidate.phone || '').replace(/[\s\-+]/g, '')
-    const msg = `Halo ${candidate.name}, ini pengingat interview Anda di TalentHub. Silakan konfirmasi kehadirannya.`
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+    let raw = (candidate.phone || '').replace(/[^\d+]/g, '')
+    if (raw.startsWith('08')) {
+      raw = '628' + raw.slice(2)
+    } else if (raw.startsWith('+62')) {
+      raw = raw.slice(1)
+    } else if (raw.startsWith('8')) {
+      raw = '62' + raw
+    }
+    const msg = `Halo ${candidate.name}, kami dari tim rekrutmen tertarik dengan profil dan hasil evaluasi CV Anda di TalentHub. Kapan waktu luang Anda untuk tahapan wawancara?`
+    window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   return (
