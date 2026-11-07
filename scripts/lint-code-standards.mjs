@@ -137,7 +137,26 @@ apiLines.forEach((line, idx) => {
   }
 })
 
-// 3. Check for synchronous Drizzle calls (.all()) in superadmin-ledger test suite
+// 3. Check for synchronous Drizzle calls (.all(), .get(), .run()) across services and test suites
+scanDirectory(join(process.cwd(), 'src/services'), (filePath) => {
+  if (!filePath.endsWith('.ts')) return
+  const relPath = filePath.replace(process.cwd(), '').replace(/^[\\\/]/, '')
+  const content = readFileSync(filePath, 'utf-8')
+  const fileLines = content.split('\n')
+  fileLines.forEach((line, idx) => {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) return
+    // Allow bun:sqlite setup/migration scripts or explicit sqlite calls, but ban raw synchronous Drizzle operations
+    if (/\bdb\.(select|insert|update|delete)\b[^;]*\.(run|all|get)\s*\(/i.test(line)) {
+      VIOLATIONS.push({
+        file: filePath,
+        line: idx + 1,
+        reason: `Synchronous Drizzle operation (.run(), .all(), .get()) detected in ${relPath}. Cloudflare D1 runtime requires asynchronous promise awaits (await db...).`
+      })
+    }
+  })
+})
+
 const testFile = join(process.cwd(), 'tests/superadmin-ledger.test.ts')
 const testContent = readFileSync(testFile, 'utf-8')
 const testLines = testContent.split('\n')

@@ -37,6 +37,17 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .scratch/
 .taste-skill/
 
+# vendor/agent skills installed locally across assistants
+.agents/skills/
+.claude/skills/
+.commandcode/skills/
+.hermes/skills/
+.opencode/
+.pi/skills/
+.qwen/skills/
+.zcode/skills/
+skills/
+
 # candidate documents are private, never published or committed
 public/uploads/
 data/private-documents/
