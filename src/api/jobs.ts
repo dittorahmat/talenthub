@@ -2,14 +2,14 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { OrgEnv } from '../middleware/orgContext'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { BatchQueueService } from '../services/batchQueueService'
 
 export const jobsRouter = new Hono<OrgEnv>()
 
 jobsRouter.get('/', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const allJobs = await db.select().from(jobs).where(eq(jobs.organizationId, orgId)).all()
     const allApplicants = await db.select().from(applicants).where(eq(applicants.organizationId, orgId)).all()
 
@@ -34,7 +34,7 @@ jobsRouter.get('/', async (c) => {
 
 jobsRouter.post('/', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const body = await c.req.json()
     const { title, location, remote, posted_at } = body
     if (!title || !location) {
@@ -66,7 +66,7 @@ jobsRouter.post('/', async (c) => {
 
 jobsRouter.delete('/:id', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -83,7 +83,7 @@ jobsRouter.delete('/:id', async (c) => {
 
 jobsRouter.get('/:id', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 

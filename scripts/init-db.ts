@@ -79,6 +79,7 @@ sqlite.exec(`
 
   CREATE TABLE IF NOT EXISTS inbox_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     file_path TEXT NOT NULL,

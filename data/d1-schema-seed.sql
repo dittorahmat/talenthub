@@ -250,6 +250,7 @@ INSERT INTO job_knockouts VALUES(5,3,'Apakah Anda bersedia bekerja onsite sesuai
 INSERT INTO job_knockouts VALUES(6,3,'Apakah Anda memiliki minimal 2 tahun pengalaman relevan?');
 CREATE TABLE inbox_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     file_path TEXT NOT NULL,

@@ -33,8 +33,14 @@
 
 ## 4. Automated Verification & Guardrails
 - Sebelum menyelesaikan pekerjaan atau membuat PR/commit, agen WAJIB menjalankan:
-  1. `bun run test` (memastikan seluruh 8 suite tes integrasi lulus 100%).
-  2. `bun run check` (`node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, copywriting AI-slop, synchronous Drizzle call, build client, dan bundle Cloudflare Worker).
+  1. `bun run test` (memastikan seluruh 14 suite tes integrasi lulus 100%).
+  2. `bun run check` (`node scripts/lint-copywriting.mjs && node scripts/lint-code-standards.mjs && bun x tsc --noEmit && vite build && wrangler deploy --dry-run` untuk menjamin tidak ada regresi tipe data TypeScript, copywriting AI-slop, synchronous Drizzle call di route/services/tests, build client, dan bundle Cloudflare Worker).
+- **Test Database Self-Healing & Idempotency**:
+  - Konfigurasi preload tes (`tests/setup.ts`) otomatis menginisialisasi skema tabel dasar D1/SQLite (`user`, `session`, `account`, `organizations`, `jobs`, `applicants`, `inbox_items`, dll.) secara idempoten jika file database lokal kosong atau belum di-seed, sehingga suite tes tidak boleh berasumsi manual seed sebelum dijalankan.
+- **Subagent Concurrency & Scoped Iteration**:
+  - Saat mengimplementasikan tiket dalam subagent atau memperbaiki temuan review, gunakan *targeted test execution* (`bun test tests/<specific-file>.test.ts`) selama siklus red-green-refactor untuk menghemat waktu dan token, dan jalankan verifikasi penuh (`bun run check && bun run test`) hanya pada gerbang final integrasi.
+- **Service Layer Drizzle Queries**:
+  - Seluruh operasi query Drizzle di `src/services/` dan `src/api/` WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). Pemanggilan synchronous `.get()`, `.all()`, atau `.run()` dilarang keras dan otomatis diblokir oleh linter `scripts/lint-code-standards.mjs`.
 - Dokumentasi akun default pengujian dan alur Better Auth tersimpan di [docs/auth-setup.md](docs/auth-setup.md).
 - Peta rute halaman utama tersimpan di:
   - `/` (Landing Page) &rarr; `src/pages/LandingPage.tsx`

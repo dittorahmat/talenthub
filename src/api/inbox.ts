@@ -1,10 +1,9 @@
 import { Hono } from 'hono'
 import { db } from '../db'
-import { applicants, jobs, inboxItems, jobKnockouts, activities } from '../db/schema'
+import { jobs, inboxItems, jobKnockouts } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
-import { OrgEnv } from '../middleware/orgContext'
-import { BatchQueueService, BatchItemInput } from '../services/batchQueueService'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
+import { candidateIntakeService } from '../services/candidateIntakeService'
 import { getDocument } from '../services/documentStorage'
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -13,21 +12,6 @@ const MAX_BATCH_BYTES = 25 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
 export const inboxRouter = new Hono<OrgEnv>()
-
-function extractKeywords(text: string): string[] {
-  const lower = text.toLowerCase()
-  return KEYWORD_POOL.filter((kw) => lower.includes(kw.toLowerCase()))
-}
-
-function sanitizeName(filename: string): string {
-  const base = filename.replace(/\.[^.]+$/, '')
-  const cleaned = base.replace(/[_-]+/g, ' ').replace(/[^a-zA-Z0-9\s]/g, ' ').trim()
-  if (!cleaned) return 'Kandidat'
-  return cleaned
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ')
-}
 
 /**
  * Streams the request body into memory only up to `maxBytes`. The read is
@@ -89,14 +73,14 @@ function mapInboxRow(r: any) {
 }
 
 inboxRouter.get('/jobs/:id/inbox', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
   const includeDismissed = c.req.query('include') === 'dismissed'
-  let items = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
+  let items = await db.select().from(inboxItems).where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId))).all()
   if (!includeDismissed) {
     items = items.filter((i) => (i as any).status !== 'dismissed')
   }
@@ -109,24 +93,24 @@ inboxRouter.get('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.get('/jobs/:id/inbox/status', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
-  const status = await BatchQueueService.getJobBatchStatus(jobId)
+  const status = await candidateIntakeService.getBatchProgress(orgId, jobId)
   return c.json(status)
 })
 
 inboxRouter.post('/jobs/:id/inbox/cancel', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
-  const result = await BatchQueueService.cancelQueuedBatch(orgId, jobId)
+  const result = await candidateIntakeService.cancelBatch(orgId, jobId)
   return c.json({
     message: `${result.cancelledCount} antrean berhasil dibatalkan.`,
     refundedCredits: result.refundedCredits,
@@ -134,29 +118,26 @@ inboxRouter.post('/jobs/:id/inbox/cancel', async (c) => {
 })
 
 inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const count = parseInt(c.req.query('count') || '1')
 
-  const preflight = await BatchQueueService.checkPreFlightBalance(orgId, Math.max(1, count))
+  const preflight = await candidateIntakeService.checkPreFlightBalance(orgId, Math.max(1, count))
   return c.json(preflight)
 })
 
 inboxRouter.get('/inbox/:itemId/resume', async (c) => {
-  const orgId = c.get('orgId')
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.notFound()
 
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get()
-  if (!item || !item.filePath) return c.notFound()
-
-  const job = await db
+  const item = await db
     .select()
-    .from(jobs)
-    .where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId)))
+    .from(inboxItems)
+    .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
     .get()
-  if (!job) return c.notFound()
+  if (!item || !item.filePath) return c.notFound()
 
   const document = await getDocument(item.filePath)
   if (!document) return c.notFound()
@@ -173,14 +154,13 @@ inboxRouter.get('/inbox/:itemId/resume', async (c) => {
 })
 
 inboxRouter.post('/jobs/:id/inbox', async (c) => {
-  const orgId = c.get('orgId')
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
-  // Reject an oversized body before it is buffered into memory. The platform
-  // may enforce its own cap upstream, but the application must not depend on it.
+  // Reject an oversized body before it is buffered into memory.
   const declaredLength = Number(c.req.header('content-length') ?? '0')
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BATCH_BYTES) {
     return c.json({
@@ -229,7 +209,7 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
   }
 
   // Pre-flight check balance for batch
-  const preflight = await BatchQueueService.checkPreFlightBalance(orgId, files.length)
+  const preflight = await candidateIntakeService.checkPreFlightBalance(orgId, files.length)
   if (!preflight.allowed) {
     return c.json({
       error: 'INSUFFICIENT_CREDIT',
@@ -240,8 +220,8 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
     }, 402)
   }
 
-  // Convert files to buffer items for BatchQueueService
-  const batchInputs: BatchItemInput[] = []
+  // Convert files to buffer items for candidateIntakeService
+  const batchInputs: { filename: string; buffer: Buffer }[] = []
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     if (!(ALLOWED_EXTS as readonly string[]).includes(ext as any)) continue
@@ -258,15 +238,19 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
     return c.json({ error: 'No valid files provided' }, 400)
   }
 
-  const batchResult = await BatchQueueService.enqueueBatch({
+  const batchResult = await candidateIntakeService.submitBatch({
     orgId,
     jobId,
     files: batchInputs,
     autoProcessAsync: true,
   })
 
-  // Also query fresh inbox items so caller receives immediate list
-  const freshItems = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
+  // Query fresh inbox items so caller receives immediate list
+  const freshItems = await db
+    .select()
+    .from(inboxItems)
+    .where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId)))
+    .all()
 
   return c.json({
     message: `Batch ${batchResult.queuedCount} berkas CV berhasil masuk antrean.`,
@@ -277,90 +261,45 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.post('/inbox/:itemId/promote', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
-  if (!item) return c.json({ error: 'Inbox item not found' }, 404)
-
-  // Verify parent job belongs to this org
-  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
-  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
-
-  if (item.promotedApplicantId) return c.json({ error: 'Already promoted' }, 409)
-  if (item.status === 'promoted') return c.json({ error: 'Already promoted' }, 409)
 
   let body: any = {}
   try { body = await c.req.json() } catch { body = {} }
-  const name = (body.name && String(body.name).trim()) || item.name || sanitizeName(item.filename)
-  const email = (body.email && String(body.email).trim().toLowerCase()) || item.email || `inbox-${itemId}@example.com`
 
-  const now = new Date().toISOString()
-  const inserted = await db.insert(applicants).values({
-    organizationId: orgId,
-    jobId: item.jobId,
-    name,
-    email,
-    phone: item.phone ?? '',
-    source: 'Inbox',
-    status: 'Applied',
-    resumePath: item.filePath,
-    resumeUrl: '',
-    resumeFilename: item.filename,
-    resumeKeywords: item.keywords,
-    createdAt: now,
-    updatedAt: now,
-    screeningStatus: item.status === 'ready' ? 'ready' : 'pending',
-    screeningSummary: item.rationale,
-    screeningScore: item.score,
-    screeningBand: item.band,
-    screeningMatched: item.keywords,
-    screeningMissing: null,
-    screeningExpYears: null,
-  }).returning().get() as any
-
-  await db
-    .update(applicants)
-    .set({ resumeUrl: `/api/applicants/${inserted.id}/resume` })
-    .where(eq(applicants.id, inserted.id))
-
-  await db.insert(activities).values({
-    organizationId: orgId,
-    applicantId: inserted.id,
-    type: 'status_change',
-    description: `Kandidat dipromosikan dari inbox: ${inserted.name}`,
-    user: 'HR Admin',
-    timestamp: now,
-  }).run()
-
-  await db.update(inboxItems).set({ status: 'promoted', promotedApplicantId: inserted.id }).where(eq(inboxItems.id, itemId)).run()
-
-  return c.json({
-    success: true,
-    applicant: {
-      id: inserted.id,
-      organization_id: inserted.organizationId,
-      job_id: inserted.jobId,
-      name: inserted.name,
-      email: inserted.email,
-      status: inserted.status,
-      screening_score: inserted.screeningScore,
-      screening_band: inserted.screeningBand,
-    },
-    inboxItemId: itemId,
-  })
+  try {
+    const result = await candidateIntakeService.promoteInboxItem(orgId, itemId, {
+      name: body.name,
+      email: body.email,
+    })
+    return c.json({
+      success: true,
+      applicant: result.applicant,
+      inboxItemId: result.inboxItemId,
+    })
+  } catch (err: any) {
+    if (err.status === 404 || err.message === 'Inbox item not found') {
+      return c.json({ error: 'Inbox item not found' }, 404)
+    }
+    if (err.status === 409 || err.message === 'Already promoted') {
+      return c.json({ error: 'Already promoted' }, 409)
+    }
+    return c.json({ error: err.message || 'Failed to promote applicant' }, 500)
+  }
 })
 
 inboxRouter.post('/inbox/:itemId/dismiss', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
+  const item = await db
+    .select()
+    .from(inboxItems)
+    .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
+    .get() as any
   if (!item) return c.json({ error: 'Inbox item not found' }, 404)
 
-  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
-  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
-
-  await db.update(inboxItems).set({ status: 'dismissed' }).where(eq(inboxItems.id, itemId)).run()
+  await db.update(inboxItems).set({ status: 'dismissed' }).where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId))).run()
   return c.json({ success: true, id: itemId })
 })

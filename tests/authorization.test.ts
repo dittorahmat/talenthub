@@ -79,4 +79,18 @@ describe('Tenant-scoped read authorization', () => {
     const otherData = (await otherView.json()) as { requests: Array<{ note?: string }> }
     expect(otherData.requests.some((request) => request.note === 'catatan pribadi pemilik')).toBe(false)
   })
+
+  it('fails closed when tenant context is missing or rejected', async () => {
+    // Unauthenticated inbox request fails with 401
+    const unauthInbox = await server.fetch(new Request('http://localhost:3001/api/jobs/1/inbox'))
+    expect(unauthInbox.status).toBe(401)
+
+    // Unauthenticated applicants creation fails with 401
+    const unauthApp = await server.fetch(new Request('http://localhost:3001/api/applicants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Hacker', email: 'hacker@example.com' }),
+    }))
+    expect(unauthApp.status).toBe(401)
+  })
 })

@@ -1,6 +1,7 @@
 import { db } from '../db'
 import { creditWallets, creditTransactions } from '../db/schema'
 import { eq, desc, and, gte, sql } from 'drizzle-orm'
+import { isCorruptedFileError } from './aiScreeningService'
 
 export interface WalletData {
   id: number
@@ -185,7 +186,7 @@ export async function commitCredit(
   orgId: number,
   reservationRef?: string,
   description?: string,
-  _amount: number = 1,
+  _deprecatedAmount?: number,
 ): Promise<{ success: boolean; newBalance: number; transaction: TransactionData }> {
   const wallet = await getOrCreateWallet(orgId)
   const now = new Date().toISOString()
@@ -211,6 +212,47 @@ export async function commitCredit(
     success: true,
     newBalance: wallet.balance,
     transaction: mapTransactionRow(inserted),
+  }
+}
+
+/**
+ * Unit-of-work helper that executes an action inside an atomic reserve-settle-refund credit lifecycle.
+ * Atomically reserves `cost` credits, runs `action()`, commits settlement on success,
+ * or issues an automatic refund if an error occurs.
+ */
+export async function executeMetered<T>(
+  orgId: number,
+  cost: number,
+  description: string,
+  action: () => Promise<T>,
+): Promise<{ result: T; transaction: TransactionData }> {
+  const reservation = await reserveCredit(orgId, cost, description)
+
+  try {
+    const result = await action()
+    const committed = await commitCredit(orgId, String(reservation.transaction.id), description)
+    return {
+      result,
+      transaction: committed.transaction,
+    }
+  } catch (error: any) {
+    const isCorrupt = isCorruptedFileError(error)
+
+    const refundReason: CreditTransactionType = isCorrupt
+      ? 'REFUND_CORRUPTED_FILE'
+      : 'REFUND_PROCESSING_ERROR'
+
+    const refundDescription = isCorrupt
+      ? `Refund ${cost} credit: file CV rusak atau tidak terbaca`
+      : `Refund ${cost} credit: error pemrosesan (${error?.message || 'unknown error'})`
+
+    try {
+      await refundCredit(orgId, cost, refundReason, refundDescription)
+    } catch (refundErr) {
+      console.error(`[executeMetered] Failed to execute refund for org ${orgId}:`, refundErr)
+    }
+
+    throw error
   }
 }
 
