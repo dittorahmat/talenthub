@@ -3,7 +3,7 @@ import { db } from '../db'
 import { applicants, activities, jobs } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { OrgEnv } from '../middleware/orgContext'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { getWallet, executeMetered } from '../services/walletService'
 import { evaluateResume, isCorruptedOrUnreadableBuffer, CorruptedFileError } from '../services/aiScreeningService'
 import { contentTypeForFilename, deleteDocument, putDocument } from '../services/documentStorage'
@@ -15,7 +15,7 @@ export const resumeRouter = new Hono<OrgEnv>()
 
 resumeRouter.post('/:id/resume', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 

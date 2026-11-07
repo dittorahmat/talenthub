@@ -2,14 +2,14 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants, activities } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { OrgEnv } from '../middleware/orgContext'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
 
 export const whatsappRouter = new Hono<OrgEnv>()
 
 // GET /api/whatsapp/:applicantId
 whatsappRouter.get('/:applicantId', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('applicantId'))
     if (isNaN(id)) return c.notFound()
 

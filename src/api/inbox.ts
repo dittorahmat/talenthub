@@ -3,7 +3,7 @@ import { db } from '../db'
 import { applicants, jobs, inboxItems, jobKnockouts, activities } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
-import { OrgEnv } from '../middleware/orgContext'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { BatchQueueService, BatchItemInput } from '../services/batchQueueService'
 import { getDocument } from '../services/documentStorage'
 
@@ -89,14 +89,14 @@ function mapInboxRow(r: any) {
 }
 
 inboxRouter.get('/jobs/:id/inbox', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
   if (!job) return c.json({ error: 'Job not found' }, 404)
 
   const includeDismissed = c.req.query('include') === 'dismissed'
-  let items = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
+  let items = await db.select().from(inboxItems).where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId))).all()
   if (!includeDismissed) {
     items = items.filter((i) => (i as any).status !== 'dismissed')
   }
@@ -109,7 +109,7 @@ inboxRouter.get('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.get('/jobs/:id/inbox/status', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
@@ -120,7 +120,7 @@ inboxRouter.get('/jobs/:id/inbox/status', async (c) => {
 })
 
 inboxRouter.post('/jobs/:id/inbox/cancel', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
@@ -134,7 +134,7 @@ inboxRouter.post('/jobs/:id/inbox/cancel', async (c) => {
 })
 
 inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const count = parseInt(c.req.query('count') || '1')
@@ -144,19 +144,16 @@ inboxRouter.get('/jobs/:id/inbox/preflight', async (c) => {
 })
 
 inboxRouter.get('/inbox/:itemId/resume', async (c) => {
-  const orgId = c.get('orgId')
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.notFound()
 
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get()
-  if (!item || !item.filePath) return c.notFound()
-
-  const job = await db
+  const item = await db
     .select()
-    .from(jobs)
-    .where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId)))
+    .from(inboxItems)
+    .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
     .get()
-  if (!job) return c.notFound()
+  if (!item || !item.filePath) return c.notFound()
 
   const document = await getDocument(item.filePath)
   if (!document) return c.notFound()
@@ -173,7 +170,7 @@ inboxRouter.get('/inbox/:itemId/resume', async (c) => {
 })
 
 inboxRouter.post('/jobs/:id/inbox', async (c) => {
-  const orgId = c.get('orgId')
+  const { orgId } = requireTenant(c)
   const jobId = parseInt(c.req.param('id'))
   if (isNaN(jobId)) return c.json({ error: 'Job not found' }, 404)
   const job = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId))).get()
@@ -266,7 +263,11 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
   })
 
   // Also query fresh inbox items so caller receives immediate list
-  const freshItems = await db.select().from(inboxItems).where(eq(inboxItems.jobId, jobId)).all()
+  const freshItems = await db
+    .select()
+    .from(inboxItems)
+    .where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId)))
+    .all()
 
   return c.json({
     message: `Batch ${batchResult.queuedCount} berkas CV berhasil masuk antrean.`,
@@ -277,15 +278,15 @@ inboxRouter.post('/jobs/:id/inbox', async (c) => {
 })
 
 inboxRouter.post('/inbox/:itemId/promote', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
+  const item = await db
+    .select()
+    .from(inboxItems)
+    .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
+    .get() as any
   if (!item) return c.json({ error: 'Inbox item not found' }, 404)
-
-  // Verify parent job belongs to this org
-  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
-  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
 
   if (item.promotedApplicantId) return c.json({ error: 'Already promoted' }, 409)
   if (item.status === 'promoted') return c.json({ error: 'Already promoted' }, 409)
@@ -333,7 +334,7 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
     timestamp: now,
   }).run()
 
-  await db.update(inboxItems).set({ status: 'promoted', promotedApplicantId: inserted.id }).where(eq(inboxItems.id, itemId)).run()
+  await db.update(inboxItems).set({ status: 'promoted', promotedApplicantId: inserted.id }).where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId))).run()
 
   return c.json({
     success: true,
@@ -352,15 +353,16 @@ inboxRouter.post('/inbox/:itemId/promote', async (c) => {
 })
 
 inboxRouter.post('/inbox/:itemId/dismiss', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const itemId = parseInt(c.req.param('itemId'))
   if (isNaN(itemId)) return c.json({ error: 'Inbox item not found' }, 404)
-  const item = await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get() as any
+  const item = await db
+    .select()
+    .from(inboxItems)
+    .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
+    .get() as any
   if (!item) return c.json({ error: 'Inbox item not found' }, 404)
 
-  const job = await db.select().from(jobs).where(and(eq(jobs.id, item.jobId), eq(jobs.organizationId, orgId))).get()
-  if (!job) return c.json({ error: 'Inbox item not found' }, 404)
-
-  await db.update(inboxItems).set({ status: 'dismissed' }).where(eq(inboxItems.id, itemId)).run()
+  await db.update(inboxItems).set({ status: 'dismissed' }).where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId))).run()
   return c.json({ success: true, id: itemId })
 })

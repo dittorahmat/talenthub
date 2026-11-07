@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { jobs, applicants, notes, activities } from '../db/schema'
 import { eq, desc, and } from 'drizzle-orm'
-import { OrgEnv } from '../middleware/orgContext'
+import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
 import { deleteDocument, getDocument } from '../services/documentStorage'
 import crypto from 'crypto'
@@ -28,7 +28,7 @@ function documentResponse(document: { data: ArrayBuffer; contentType: string }, 
 }
 
 applicantsRouter.post('/:id/share-token', async (c) => {
-  const orgId = c.get('orgId') || 1
+  const { orgId } = requireTenant(c)
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.notFound()
   const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
@@ -93,7 +93,7 @@ applicantsRouter.get('/public/share/:token/resume', async (c) => {
 })
 
 applicantsRouter.get('/:id/resume', async (c) => {
-  const orgId = c.get('orgId')
+  const { orgId } = requireTenant(c)
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.notFound()
 
@@ -112,7 +112,7 @@ applicantsRouter.get('/:id/resume', async (c) => {
 
 applicantsRouter.get('/:id/screening', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
     const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
@@ -153,7 +153,7 @@ applicantsRouter.get('/:id/screening', async (c) => {
 
 applicantsRouter.get('/:id/summary', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -209,7 +209,7 @@ applicantsRouter.get('/:id/summary', async (c) => {
 
 applicantsRouter.get('/:id', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -289,7 +289,7 @@ applicantsRouter.get('/:id', async (c) => {
 
 applicantsRouter.post('/', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const data = await c.req.json()
     const { name, email, phone, source, status, job_id } = data
 
@@ -297,7 +297,10 @@ applicantsRouter.post('/', async (c) => {
       return c.json({ error: 'Nama dan email wajib diisi' }, 400)
     }
 
-    const targetJobId = job_id || 1
+    const targetJobId = job_id
+    if (!targetJobId) {
+      return c.json({ error: 'Job ID wajib diisi' }, 400)
+    }
     // Verify job belongs to this org
     const jobExists = await db.select().from(jobs).where(and(eq(jobs.id, targetJobId), eq(jobs.organizationId, orgId))).get()
     if (!jobExists) {
@@ -344,7 +347,7 @@ applicantsRouter.post('/', async (c) => {
 
 applicantsRouter.patch('/:id/status', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -377,7 +380,7 @@ applicantsRouter.patch('/:id/status', async (c) => {
 
 applicantsRouter.patch('/:id/notes', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -419,7 +422,7 @@ applicantsRouter.patch('/:id/notes', async (c) => {
 
 applicantsRouter.delete('/:id', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
@@ -436,7 +439,7 @@ applicantsRouter.delete('/:id', async (c) => {
 
 applicantsRouter.get('/:id/activities', async (c) => {
   try {
-    const orgId = c.get('orgId') || 1
+    const { orgId } = requireTenant(c)
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 

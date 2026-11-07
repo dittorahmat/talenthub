@@ -155,6 +155,7 @@ export class BatchQueueService {
 
       const now = new Date().toISOString()
       const inserted = await db.insert(inboxItems).values({
+        organizationId: orgId,
         jobId,
         filename: file.filename,
         filePath: storageKey,
@@ -400,7 +401,7 @@ export class BatchQueueService {
         status: 'dismissed',
         rationale: 'Dibatalkan oleh pengguna (kredit dikembalikan)',
       })
-      .where(and(eq(inboxItems.jobId, jobId), eq(inboxItems.status, 'queued')))
+      .where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId), eq(inboxItems.status, 'queued')))
       .returning()
       .all() as any[]
 
@@ -433,6 +434,7 @@ export class BatchQueueService {
       .from(inboxItems)
       .where(
         and(
+          eq(inboxItems.organizationId, orgId),
           eq(inboxItems.jobId, jobId),
           inArray(inboxItems.status, ['queued', 'extracting', 'evaluating']),
         ),

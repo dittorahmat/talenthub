@@ -62,6 +62,7 @@ export const activities = sqliteTable('activities', {
 
 export const inboxItems = sqliteTable('inbox_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   jobId: integer('job_id').notNull().references(() => jobs.id, { onDelete: 'cascade' }),
   filename: text('filename').notNull(),
   filePath: text('file_path').notNull(),
