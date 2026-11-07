@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { orgFetch } from '../context/OrgContext'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  TalentHubClient,
+  ApplicantDetail,
+  NoteItem,
+  ActivityItem,
+  isInsufficientCredit,
+} from '../services/apiClient'
 import { Candidate } from './CandidateCard'
 import { FileIcon, NoteIcon, ClockIcon, WhatsAppIcon } from './Icons'
 import { Candidate1PageSummaryModal } from './Candidate1PageSummaryModal'
@@ -50,9 +56,9 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   onStatusChange,
   onDelete
 }) => {
-  const [details, setDetails] = useState<any>(null)
-  const [notes, setNotes] = useState<Note[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
+  const [details, setDetails] = useState<ApplicantDetail | null>(null)
+  const [notes, setNotes] = useState<NoteItem[]>([])
+  const [activities, setActivities] = useState<ActivityItem[]>([])
   const [newNote, setNewNote] = useState('')
   const [loading, setLoading] = useState(true)
   const [uploadingResume, setUploadingResume] = useState(false)
@@ -60,9 +66,8 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
 
-  const loadData = () => {
-    orgFetch(`/api/applicants/${candidate.id}`)
-      .then(res => res.json() as Promise<any>)
+  const loadData = useCallback(() => {
+    TalentHubClient.applicants.get(candidate.id)
       .then(data => {
         setDetails(data)
         setNotes(data.notes || [])
@@ -70,11 +75,11 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }
+  }, [candidate.id])
 
   useEffect(() => {
     loadData()
-  }, [candidate.id])
+  }, [loadData])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -84,7 +89,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
 
   // Poll every 1.5s while processing, max 10 attempts, stop when ready or unmounted
   useEffect(() => {
-    const status: string | undefined = details?.screening_status ?? details?.screeningStatus
+    const status: string | undefined = details?.screening_status
     if (status !== 'processing') return
     let count = 0
     let cancelled = false
@@ -94,14 +99,13 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
         clearInterval(interval)
         return
       }
-      orgFetch(`/api/applicants/${candidate.id}`)
-        .then(res => res.json() as Promise<any>)
+      TalentHubClient.applicants.get(candidate.id)
         .then(data => {
           if (cancelled) return
-          setDetails((prev: any) => ({ ...prev, ...data }))
+          setDetails(data)
           if (data.notes) setNotes(data.notes)
           if (data.activities) setActivities(data.activities)
-          const nextStatus: string | undefined = data?.screening_status ?? data?.screeningStatus
+          const nextStatus = data?.screening_status
           if (nextStatus === 'ready' || nextStatus === 'pending' || nextStatus == null) {
             clearInterval(interval)
           }
@@ -113,20 +117,19 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
       cancelled = true
       clearInterval(interval)
     }
-  }, [details?.screening_status, details?.screeningStatus, candidate.id])
+  }, [details?.screening_status, candidate.id])
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newNote.trim()) return
 
-    await orgFetch(`/api/applicants/${candidate.id}/notes`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: newNote, author: 'HR Admin' })
-    })
-
-    setNewNote('')
-    loadData()
+    try {
+      await TalentHubClient.applicants.addNote(candidate.id, newNote, 'HR Admin')
+      setNewNote('')
+      loadData()
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const handleNextStage = () => {
@@ -152,30 +155,18 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
     setUploadError(null)
     setUploadingResume(true)
     try {
-      const formData = new FormData()
-      formData.append('resume', file)
-      const res = await orgFetch(`/api/applicants/${candidate.id}/resume`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (res.status === 402) {
-        const data = (await res.json() as any)
+      await TalentHubClient.applicants.uploadResume(candidate.id, file)
+      loadData()
+    } catch (err: unknown) {
+      if (isInsufficientCredit(err)) {
         setUploadError({
-          message: data.message || 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.',
+          message: err.message || 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.',
           isCreditError: true
         })
-        return
+      } else {
+        const msg = err instanceof Error ? err.message : 'Gagal memproses resume'
+        setUploadError({ message: msg })
       }
-
-      if (!res.ok) {
-        const data = (await res.json() as any)
-        throw new Error(data.error || 'Gagal mengunggah resume')
-      }
-
-      loadData()
-    } catch (err: any) {
-      setUploadError({ message: err.message || 'Gagal memproses resume' })
     } finally {
       setUploadingResume(false)
       e.target.value = ''

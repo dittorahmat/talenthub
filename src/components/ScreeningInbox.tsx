@@ -1,32 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { orgFetch } from '../context/OrgContext'
+import {
+  TalentHubClient,
+  InboxItem,
+  BatchPreflightResponse,
+  isInsufficientCredit,
+} from '../services/apiClient'
+import { useScreeningProgress } from '../hooks/useScreeningProgress'
+import { sortByScoreDesc } from '../utils/scoreRanking'
 import { validateResumeFile } from '../utils/outreach'
-
-export interface InboxItem {
-  id: number | string
-  filename: string
-  status: string
-  name?: string
-  email?: string
-  phone?: string
-  score?: number
-  band?: string
-  verdict?: string
-  rationale?: string
-  matched?: string[] | string
-  missing?: string[] | string
-  knockoutFailed?: boolean
-  knockoutFailedQuestion?: string
-  knockout_failed?: boolean
-  knockout_question?: string
-  duplicateOf?: number | string | null
-  duplicate_of?: number | string | null
-  promotedApplicantId?: number | string | null
-  promoted_applicant_id?: number | string | null
-  error?: string
-  reason?: string
-  summary?: string
-}
 
 interface ScreeningInboxProps {
   jobId: number
@@ -51,7 +32,6 @@ function verdictStyle(verdict?: string | null): React.CSSProperties {
   const v = (verdict || '').toLowerCase()
   if (v === 'hire') return { color: '#16A34A', background: '#F0FDF4', border: '1px solid #BBF7D0' }
   if (v === 'consider') return { color: '#D97706', background: '#FFFBEB', border: '1px solid #FDE68A' }
-  // Pass
   return { color: '#64748B', background: '#F1F5F9', border: '1px solid #E2E8F0' }
 }
 
@@ -73,43 +53,43 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const pollCountRef = useRef(0)
-  const pollTimerRef = useRef<number | null>(null)
 
   // promote inline edit state
   const [promoteState, setPromoteState] = useState<Record<string, { name: string; email: string; show: boolean; saving?: boolean }>>({})
 
+  // pre-flight confirmation modal state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [preflightData, setPreflightData] = useState<BatchPreflightResponse | null>(null)
+  const [showPreflightModal, setShowPreflightModal] = useState(false)
+
   const fetchInbox = useCallback(async () => {
     try {
-      const res = await orgFetch(`/api/jobs/${jobId}/inbox`)
-      if (!res.ok) {
-        if (res.status === 404) {
-          setItems([])
-          setKnockouts([])
-          setError(null)
-          return
-        }
-        throw new Error(`Gagal memuat inbox (${res.status})`)
-      }
-      const data = (await res.json() as any)
-      // defensive shape handling
-      const rawItems: InboxItem[] = Array.isArray(data) ? data : data.items || data.data || []
-      const sorted = (Array.isArray(rawItems) ? [...rawItems] : []).sort((a, b) => {
-        const scoreA = typeof a.score === 'number' ? a.score : -1
-        const scoreB = typeof b.score === 'number' ? b.score : -1
-        return scoreB - scoreA
-      })
+      const res = await TalentHubClient.inbox.list(jobId)
+      const rawItems: InboxItem[] = Array.isArray(res) ? res : res.items || []
+      const sorted = sortByScoreDesc(rawItems)
       setItems(sorted)
-      const rawKOs = data.knockouts || data.knockoutQuestions || []
+      const rawKOs = (res as any).knockouts || (res as any).knockoutQuestions || []
       if (Array.isArray(rawKOs)) setKnockouts(rawKOs)
       setError(null)
-    } catch (e: any) {
-      setError(e?.message || 'Gagal memuat inbox')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Gagal memuat inbox'
+      setError(msg)
     } finally {
       setLoading(false)
     }
   }, [jobId])
+
+  // Hook-based screening progress tracking
+  const { progress, isProcessing, cancel: cancelProgressBatch } = useScreeningProgress(jobId, {
+    enabled: true,
+    intervalMs: 1500,
+    onComplete: () => {
+      fetchInbox()
+      window.dispatchEvent(new Event('walletChanged'))
+    },
+  })
 
   useEffect(() => {
     fetchInbox()
@@ -121,45 +101,6 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onBack])
-
-  // polling while any item is queued/parsing
-  useEffect(() => {
-    const hasPending = items.some(it => {
-      const s = getItemStatus(it)
-      return s === 'queued' || s === 'parsing' || s === 'processing'
-    })
-    if (!hasPending) {
-      if (pollTimerRef.current) {
-        window.clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-      pollCountRef.current = 0
-      return
-    }
-    if (pollTimerRef.current) return
-    pollCountRef.current = 0
-    pollTimerRef.current = window.setInterval(async () => {
-      pollCountRef.current += 1
-      if (pollCountRef.current > 20) {
-        if (pollTimerRef.current) window.clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-        return
-      }
-      await fetchInbox()
-      // stop check will happen on next effect cycle via items change
-    }, 1500)
-    return () => {
-      if (pollTimerRef.current) {
-        window.clearInterval(pollTimerRef.current)
-        pollTimerRef.current = null
-      }
-    }
-  }, [items, fetchInbox])
-
-  // pre-flight confirmation modal state
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [preflightData, setPreflightData] = useState<{ required: number; current: number; shortage: number; allowed: boolean } | null>(null)
-  const [showPreflightModal, setShowPreflightModal] = useState(false)
 
   const handleFiles = async (files: FileList | File[]) => {
     const rawArr = Array.from(files)
@@ -177,46 +118,33 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
 
     const arr = rawArr
 
-    // Pre-flight check via API before accepting
+    // Pre-flight check via client before accepting
     try {
-      const pfRes = await orgFetch(`/api/jobs/${jobId}/inbox/preflight?count=${arr.length}`)
-      if (pfRes.ok) {
-        const pf: any = await pfRes.json()
-        setPendingFiles(arr)
-        setPreflightData(pf)
-        setShowPreflightModal(true)
-        return
-      }
-    } catch {}
-
-    // Fallback direct execution if preflight check unavailable
-    executeBatchUpload(arr)
+      const pf = await TalentHubClient.inbox.preflight(jobId, arr.length)
+      setPendingFiles(arr)
+      setPreflightData(pf)
+      setShowPreflightModal(true)
+      return
+    } catch {
+      // Fallback direct execution if preflight check fails or unavailable
+      executeBatchUpload(arr)
+    }
   }
 
   const executeBatchUpload = async (arr: File[]) => {
     setShowPreflightModal(false)
     setUploading(true)
     try {
-      const fd = new FormData()
-      arr.forEach(f => fd.append('files', f))
-      const res = await orgFetch(`/api/jobs/${jobId}/inbox`, {
-        method: 'POST',
-        body: fd
-      })
-      if (!res.ok) {
-        let errorMsg = `Upload gagal (${res.status})`
-        try {
-          const json = (await res.json() as any)
-          if (json.message) errorMsg = json.message
-        } catch {}
-        throw new Error(errorMsg)
-      }
-      // trigger balance update
+      await TalentHubClient.inbox.uploadBatch(jobId, arr)
       window.dispatchEvent(new Event('walletChanged'))
       await fetchInbox()
-      pollCountRef.current = 0
-    } catch (e: any) {
-      setUploadError(e?.message || 'Upload gagal')
+    } catch (e: unknown) {
+      if (isInsufficientCredit(e)) {
+        setUploadError(e.message)
+      } else {
+        const msg = e instanceof Error ? e.message : 'Upload gagal'
+        setUploadError(msg)
+      }
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -232,11 +160,25 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
 
   const handleDismiss = async (item: InboxItem) => {
     try {
-      await orgFetch(`/api/inbox/${item.id}/dismiss`, { method: 'POST' })
+      await TalentHubClient.inbox.dismiss(Number(item.id))
       await fetchInbox()
     } catch (e) {
       console.error(e)
       await fetchInbox()
+    }
+  }
+
+  const handleCancelBatch = async () => {
+    if (!window.confirm('Batalkan seluruh antrean screening yang belum diproses dan kembalikan kredit?')) return
+    setCancelling(true)
+    try {
+      await cancelProgressBatch()
+      await fetchInbox()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Gagal membatalkan batch'
+      setUploadError(msg)
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -245,15 +187,10 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
     if (!st) return
     setPromoteState(prev => ({ ...prev, [String(item.id)]: { ...st, saving: true } }))
     try {
-      const res = await orgFetch(`/api/inbox/${item.id}/promote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: st.name.trim(), email: st.email.trim() })
+      await TalentHubClient.inbox.promote(Number(item.id), {
+        name: st.name.trim(),
+        email: st.email.trim(),
       })
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '')
-        throw new Error(txt || `Promote gagal (${res.status})`)
-      }
       setPromoteState(prev => {
         const n = { ...prev }
         delete n[String(item.id)]
@@ -261,8 +198,9 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       })
       await fetchInbox()
       onPromoted()
-    } catch (e: any) {
-      setUploadError(e?.message || 'Gagal promote')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Gagal promote'
+      setUploadError(msg)
       setPromoteState(prev => ({ ...prev, [String(item.id)]: { ...st, saving: false } }))
     }
   }
@@ -280,29 +218,59 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
       <style>{`@keyframes ch-shimmer { 0% { opacity: 0.55; } 50% { opacity: 1; } 100% { opacity: 0.55; } } @media (prefers-reduced-motion: reduce) { [data-ch-shimmer] { animation: none !important; } }`}</style>
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <button
-            type="button"
-            aria-label="Kembali ke dashboard"
-            onClick={onBack}
-            style={{ background: 'white', border: '1px solid #CBD5E1', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
-          >
-            ← Kembali
-          </button>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
-              Screening Inbox (Demo) — {jobTitle}
-            </h1>
-            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748B' }}>
-              Drop CV di bawah, lihat triase live, lalu promote ke Applied. Semua skor & verdict adalah simulasi demo.
-            </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              aria-label="Kembali ke dashboard"
+              onClick={onBack}
+              style={{ background: 'white', border: '1px solid #CBD5E1', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+            >
+              ← Kembali
+            </button>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+                Screening Inbox — {jobTitle}
+              </h1>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748B' }}>
+                Drop berkas CV di bawah untuk screening otomatis dan evaluasi kualifikasi kandidat.
+              </p>
+            </div>
           </div>
+
+          {/* Batch Progress & Cancel Action */}
+          {isProcessing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'white', border: '1px solid #E2E8F0', padding: '8px 14px', borderRadius: '10px' }}>
+              <div style={{ fontSize: '12px', color: '#475569' }}>
+                <span style={{ fontWeight: 700, color: '#0D9488' }}>Memproses:</span> {progress?.completed ?? 0} dari {progress?.total ?? 0} ({progress?.percentage ?? 0}%)
+              </div>
+              <button
+                type="button"
+                aria-label="Batalkan antrean batch"
+                disabled={cancelling}
+                onClick={handleCancelBatch}
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#DC2626',
+                  cursor: cancelling ? 'wait' : 'pointer',
+                  opacity: cancelling ? 0.6 : 1,
+                }}
+              >
+                {cancelling ? 'Membatalkan...' : 'Batal Antrean'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Knockouts info */}
         {knockouts.length > 0 && (
           <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Knockout checks (Demo)</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Kriteria Knockout</div>
             <ul style={{ margin: 0, paddingLeft: '16px' }}>
               {knockouts.map(k => (
                 <li key={String(k.id)} style={{ fontSize: '12px', color: '#64748B' }}>{k.question}</li>
@@ -342,7 +310,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
             aria-hidden="true"
           />
           <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: '6px' }}>
-            {uploading ? 'Mengunggah...' : 'Drop CV di sini atau klik untuk pilih file (Demo)'}
+            {uploading ? 'Mengunggah...' : 'Drop CV di sini atau klik untuk pilih file'}
           </div>
           <div style={{ fontSize: '12px', color: '#64748B' }}>
             PDF, DOCX, TXT · maksimal 5MB per file · bisa multi-file
@@ -376,16 +344,16 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
               const isPromoted = status === 'promoted' || !!item.promotedApplicantId || !!item.promoted_applicant_id
               const duplicateOf = item.duplicateOf ?? item.duplicate_of
               const isDuplicate = !!duplicateOf || status === 'duplicate'
-              const score = item.score ?? (item as any).screening_score ?? (item as any).screeningScore
-              const band = item.band ?? (item as any).screening_band ?? (item as any).screeningBand
-              const verdictRaw = item.verdict ?? (item as any).screening_verdict ?? (item as any).screeningVerdict
+              const score = item.score
+              const band = item.band
+              const verdictRaw = item.verdict
               const verdict = deriveVerdict(band, verdictRaw)
-              const rationale = item.rationale ?? (item as any).screening_summary ?? (item as any).rationale ?? ''
-              const matched = parseChips((item.matched as any) ?? (item as any).screening_matched ?? (item as any).matched)
-              const missing = parseChips((item.missing as any) ?? (item as any).screening_missing ?? (item as any).missing)
-              const knockoutFailed = item.knockoutFailed ?? item.knockout_failed ?? (item as any).knockoutFailed ?? false
-              const knockoutQ = item.knockoutFailedQuestion ?? item.knockout_question ?? (item as any).knockoutQuestion ?? (knockouts[0]?.question || 'Knockout tidak terpenuhi')
-              const reasonText = (item.reason ?? item.error ?? (item as any).error_reason ?? '') as string
+              const rationale = item.rationale || item.summary || ''
+              const matched = parseChips(item.matched)
+              const missing = parseChips(item.missing)
+              const knockoutFailed = item.knockoutFailed ?? item.knockout_failed ?? false
+              const knockoutQ = item.knockoutFailedQuestion ?? item.knockout_question ?? (knockouts[0]?.question || 'Knockout tidak terpenuhi')
+              const reasonText = (item.reason ?? item.error ?? '') as string
               const pState = promoteState[String(item.id)]
 
               return (
@@ -483,7 +451,7 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
                       )}
                       {score != null && band && verdict && (
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          Skor {String(score)}% · {String(band)} · Verdict <strong style={{ color: '#0F172A' }}>{verdict}</strong> <span style={{ color: '#94A3B8' }}>(Demo)</span>
+                          Skor {String(score)}% · {String(band)} · Verdict <strong style={{ color: '#0F172A' }}>{verdict}</strong>
                         </div>
                       )}
                     </div>
@@ -546,7 +514,6 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
                         </button>
                       </div>
                     )}
-                    {/* Dismiss always available unless already promoted? spec says dismiss hides item without record */}
                     <button
                       type="button"
                       aria-label={`Dismiss ${item.filename}`}
@@ -585,48 +552,50 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             border: '1px solid #E2E8F0',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Konfirmasi Batch AI Screening</h3>
-                <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748B' }}>Pemotongan kredit untuk {pendingFiles.length} berkas CV</p>
-              </div>
-            </div>
+            <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
+              Konfirmasi Pemrosesan Batch
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
+              Anda akan mengunggah <strong>{pendingFiles.length} berkas CV</strong> untuk job <strong>{jobTitle}</strong>.
+            </p>
 
-            <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0', marginBottom: '20px', fontSize: '13px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B' }}>Jumlah CV diunggah:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>{pendingFiles.length} berkas</span>
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                <span style={{ color: '#64748B' }}>Kredit Dibutuhkan:</span>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>{preflightData.required} Kredit</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B' }}>Kredit dibutuhkan:</span>
-                <span style={{ fontWeight: 700, color: '#D97706' }}>{preflightData.required} Kredit</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                <span style={{ color: '#64748B' }}>Saldo Dompet Saat Ini:</span>
+                <span style={{ fontWeight: 700, color: preflightData.allowed ? '#0D9488' : '#DC2626' }}>{preflightData.current} Kredit</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#64748B' }}>Saldo kredit saat ini:</span>
-                <span style={{ fontWeight: 700, color: '#0F172A' }}>{preflightData.current} Kredit</span>
-              </div>
-              <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '8px', marginTop: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748B' }}>Sisa saldo setelah proses:</span>
-                <span style={{ fontWeight: 700, color: preflightData.allowed ? '#16A34A' : '#DC2626' }}>
-                  {preflightData.allowed ? `${preflightData.current - preflightData.required} Kredit` : 'Kredit Tidak Cukup'}
-                </span>
-              </div>
+              {!preflightData.allowed && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: '8px', fontSize: '13px', color: '#DC2626', fontWeight: 700 }}>
+                  <span>Kekurangan:</span>
+                  <span>{preflightData.shortage} Kredit</span>
+                </div>
+              )}
             </div>
 
             {!preflightData.allowed && (
-              <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
-                 Saldo kredit Anda kurang {preflightData.shortage} kredit untuk memproses batch ini. Silakan Top Up terlebih dahulu.
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '10px 12px', marginBottom: '16px', fontSize: '12px', color: '#991B1B' }}>
+                Saldo kredit tidak mencukupi untuk memproses seluruh berkas. Silakan lakukan Top Up kredit atau kurangi jumlah file yang diunggah.
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
-                onClick={() => { setShowPreflightModal(false); setPendingFiles([]); }}
-                style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: 'white', color: '#475569', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                onClick={() => { setShowPreflightModal(false); setPendingFiles([]) }}
+                style={{
+                  background: 'white',
+                  border: '1px solid #CBD5E1',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer',
+                }}
               >
                 Batal
               </button>
@@ -634,21 +603,38 @@ export const ScreeningInbox: React.FC<ScreeningInboxProps> = ({ jobId, jobTitle,
                 <button
                   type="button"
                   onClick={() => executeBatchUpload(pendingFiles)}
-                  style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#0D9488', color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                  style={{
+                    background: '#0D9488',
+                    border: 'none',
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
                 >
-                  Lanjutkan & Proses AI
+                  Lanjutkan Screening ({preflightData.required} Kredit)
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => {
-                    setShowPreflightModal(false);
-                    setPendingFiles([]);
-                    window.dispatchEvent(new CustomEvent('openTopupModal'));
+                    setShowPreflightModal(false)
+                    window.dispatchEvent(new Event('openTopupModal'))
                   }}
-                  style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#D97706', color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                  style={{
+                    background: '#2563EB',
+                    border: 'none',
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
                 >
-                  + Top Up Saldo
+                  Top Up Saldo Kredit
                 </button>
               )}
             </div>

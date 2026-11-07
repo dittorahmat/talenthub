@@ -20,6 +20,7 @@ import { SearchIcon } from '../components/Icons'
 import { WorkspaceSwitcher } from '../components/WorkspaceSwitcher'
 import { CreditPill } from '../components/CreditPill'
 import { orgFetch, useOrg } from '../context/OrgContext'
+import { sortByScoreDesc } from '../utils/scoreRanking'
 
 const STAGES = ['Applied', 'Phone Screen', 'Technical', 'Final Interview', 'Offer', 'Hired']
 
@@ -59,11 +60,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
         setJob(data)
         const rawApplicants: Candidate[] = data.applicants || []
         // Sort candidates by screening score descending (auto-ranking)
-        const sorted = [...rawApplicants].sort((a, b) => {
-          const scoreA = typeof a.screening_score === 'number' ? a.screening_score : -1
-          const scoreB = typeof b.screening_score === 'number' ? b.screening_score : -1
-          return scoreB - scoreA
-        })
+        const sorted = sortByScoreDesc(rawApplicants)
         setCandidates(sorted)
       })
       .catch(console.error)
