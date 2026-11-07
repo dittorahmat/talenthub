@@ -1,6 +1,7 @@
 import { db } from '../db'
 import { creditWallets, creditTransactions } from '../db/schema'
 import { eq, desc, and, gte, sql } from 'drizzle-orm'
+import { isCorruptedFileError } from './aiScreeningService'
 
 export interface WalletData {
   id: number
@@ -235,10 +236,7 @@ export async function executeMetered<T>(
       transaction: committed.transaction,
     }
   } catch (error: any) {
-    const isCorrupt =
-      error?.name === 'CorruptedFileError' ||
-      error?.code === 'CORRUPTED_FILE' ||
-      /corrupt/i.test(error?.message || '')
+    const isCorrupt = isCorruptedFileError(error)
 
     const refundReason: CreditTransactionType = isCorrupt
       ? 'REFUND_CORRUPTED_FILE'

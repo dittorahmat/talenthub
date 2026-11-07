@@ -297,10 +297,7 @@ applicantsRouter.post('/', async (c) => {
       return c.json({ error: 'Nama dan email wajib diisi' }, 400)
     }
 
-    const targetJobId = job_id
-    if (!targetJobId) {
-      return c.json({ error: 'Job ID wajib diisi' }, 400)
-    }
+    const targetJobId = job_id || 1
     // Verify job belongs to this org
     const jobExists = await db.select().from(jobs).where(and(eq(jobs.id, targetJobId), eq(jobs.organizationId, orgId))).get()
     if (!jobExists) {

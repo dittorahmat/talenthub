@@ -1,6 +1,6 @@
 import { db } from '../db'
 import { applicants, activities, jobs, inboxItems, jobKnockouts } from '../db/schema'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, InferSelectModel } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import {
   reserveCredit,
@@ -12,6 +12,7 @@ import {
 import {
   evaluateResume,
   isCorruptedOrUnreadableBuffer,
+  isCorruptedFileError,
   CorruptedFileError,
   AIEvaluationResult,
 } from './aiScreeningService'
@@ -22,6 +23,53 @@ import {
   putDocument,
 } from './documentStorage'
 import { extractKeywords, hashInt } from '../api/screening'
+
+// --- Inferred Schema Types ---
+export type InboxItemRow = InferSelectModel<typeof inboxItems>
+export type ApplicantRow = InferSelectModel<typeof applicants>
+export type JobRow = InferSelectModel<typeof jobs>
+export type JobKnockoutRow = InferSelectModel<typeof jobKnockouts>
+export type ActivityRow = InferSelectModel<typeof activities>
+
+// --- Canonical Promoted Applicant ---
+export interface CanonicalPromotedApplicant {
+  id: number
+  jobId: number
+  job_id: number
+  organizationId: number
+  organization_id: number
+  name: string
+  email: string
+  phone: string
+  source: string
+  status: string
+  resumeUrl: string
+  resume_url: string
+  resumeFilename: string | null
+  resume_filename: string | null
+  resumeKeywords: string | null
+  resume_keywords: string | null
+  screeningStatus: string | null
+  screening_status: string | null
+  screeningSummary: string | null
+  screening_summary: string | null
+  screeningScore: number | null
+  screening_score: number | null
+  screeningBand: string | null
+  screening_band: string | null
+  screeningVerdict: string | null
+  screening_verdict: string | null
+  screeningMatched: string | null
+  screening_matched: string | null
+  screeningMissing: string | null
+  screening_missing: string | null
+  screeningExpYears: number | null
+  screening_exp_years: number | null
+  createdAt: string
+  created_at: string
+  updatedAt: string
+  updated_at: string
+}
 
 // --- Interfaces & Types ---
 
@@ -302,11 +350,8 @@ export class CandidateIntakeService {
           provider: result.evaluation.provider,
         },
       }
-    } catch (meteredErr: any) {
-      const isCorrupt =
-        meteredErr instanceof CorruptedFileError ||
-        meteredErr?.name === 'CorruptedFileError' ||
-        /corrupt/i.test(meteredErr?.message || '')
+    } catch (meteredErr: unknown) {
+      const isCorrupt = isCorruptedFileError(meteredErr)
 
       if (isCorrupt) {
         await deleteDocument(storageKey)
@@ -406,7 +451,7 @@ export class CandidateIntakeService {
       const keywordsStr = keywordsArr.join(', ') || null
 
       const now = new Date().toISOString()
-      const inserted = (await db
+      const [inserted]: (InboxItemRow | undefined)[] = await db
         .insert(inboxItems)
         .values({
           organizationId: orgId,
@@ -429,7 +474,10 @@ export class CandidateIntakeService {
           createdAt: now,
         })
         .returning()
-        .get()) as any
+
+      if (!inserted) {
+        throw new Error(`Failed to insert inbox item for file: ${file.filename}`)
+      }
 
       queuedItems.push({
         id: inserted.id,
@@ -478,11 +526,11 @@ export class CandidateIntakeService {
     const { orgId, jobId, itemId, filename, storageKey } = msg
 
     // Fetch inbox item to verify status
-    const item = (await db
+    const [item]: (InboxItemRow | undefined)[] = await db
       .select()
       .from(inboxItems)
       .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
-      .get()) as any
+      .limit(1)
 
     if (!item) return
 
@@ -496,7 +544,11 @@ export class CandidateIntakeService {
     const doc = await getDocument(storageKey)
     const buffer = doc ? Buffer.from(doc.data) : Buffer.from('')
 
-    const jobRow = (await db.select().from(jobs).where(eq(jobs.id, jobId)).get()) as any
+    const [jobRow]: (JobRow | undefined)[] = await db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.id, jobId))
+      .limit(1)
     const jobTitle = jobRow?.title || 'Posisi Pekerjaan'
 
     await this.processInboxItem({
@@ -554,7 +606,6 @@ export class CandidateIntakeService {
             rationale: 'File CV rusak atau tidak terbaca (Kredit dikembalikan)',
           })
           .where(eq(inboxItems.id, itemId))
-          .run()
         return
       }
 
@@ -563,9 +614,12 @@ export class CandidateIntakeService {
         .update(inboxItems)
         .set({ status: 'evaluating' })
         .where(eq(inboxItems.id, itemId))
-        .run()
 
-      const itemRow = (await db.select().from(inboxItems).where(eq(inboxItems.id, itemId)).get()) as any
+      const [itemRow]: (InboxItemRow | undefined)[] = await db
+        .select()
+        .from(inboxItems)
+        .where(eq(inboxItems.id, itemId))
+        .limit(1)
       const candidateName = itemRow?.name || sanitizeCandidateName(filename)
 
       const evalResult = await evaluateResume({
@@ -575,11 +629,10 @@ export class CandidateIntakeService {
       })
 
       // Knockout check
-      const knockouts = (await db
+      const knockouts: JobKnockoutRow[] = await db
         .select()
         .from(jobKnockouts)
         .where(eq(jobKnockouts.jobId, jobId))
-        .all()) as any[]
 
       let knockoutFailed: string | null = null
       for (const k of knockouts) {
@@ -615,8 +668,8 @@ export class CandidateIntakeService {
           keywords: evalResult.matchedSkills.join(', '),
         })
         .where(eq(inboxItems.id, itemId))
-        .run()
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Unknown error'
       console.error(`[CandidateIntakeService] Failed to process inbox item #${itemId}:`, err)
       await refundCredit(
         orgId,
@@ -629,10 +682,9 @@ export class CandidateIntakeService {
         .update(inboxItems)
         .set({
           status: 'error',
-          rationale: `Gagal memproses berkas: ${err?.message || 'Unknown error'}`,
+          rationale: `Gagal memproses berkas: ${errMsg}`,
         })
         .where(eq(inboxItems.id, itemId))
-        .run()
         .catch(() => {})
     }
   }
@@ -641,11 +693,10 @@ export class CandidateIntakeService {
    * Get batch / real-time progress for a job inbox directly from durable DB state
    */
   async getBatchProgress(orgId: number, jobId: number): Promise<BatchStatusResult> {
-    const dbItems = (await db
+    const dbItems: InboxItemRow[] = await db
       .select()
       .from(inboxItems)
       .where(and(eq(inboxItems.organizationId, orgId), eq(inboxItems.jobId, jobId)))
-      .all()) as any[]
 
     const items: BatchProgressItem[] = dbItems.map((r) => {
       let status: BatchProgressItem['status'] = 'READY'
@@ -690,7 +741,7 @@ export class CandidateIntakeService {
     refundedCredits: number
   }> {
     // Atomically move only still-queued rows to dismissed.
-    const cancelledItems = (await db
+    const cancelledItems: InboxItemRow[] = await db
       .update(inboxItems)
       .set({
         status: 'dismissed',
@@ -704,7 +755,6 @@ export class CandidateIntakeService {
         )
       )
       .returning()
-      .all()) as any[]
 
     let cancelledCount = 0
     const cancelledKeys: Array<string | null> = []
@@ -738,23 +788,23 @@ export class CandidateIntakeService {
     itemId: number,
     overrides?: { name?: string; email?: string }
   ): Promise<{
-    applicant: any
+    applicant: CanonicalPromotedApplicant
     inboxItemId: number
   }> {
-    const item = (await db
+    const [item]: (InboxItemRow | undefined)[] = await db
       .select()
       .from(inboxItems)
       .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
-      .get()) as any
+      .limit(1)
 
     if (!item) {
-      const err: any = new Error('Inbox item not found')
+      const err = new Error('Inbox item not found') as Error & { status: number }
       err.status = 404
       throw err
     }
 
     if (item.promotedApplicantId || item.status === 'promoted') {
-      const err: any = new Error('Already promoted')
+      const err = new Error('Already promoted') as Error & { status: number }
       err.status = 409
       throw err
     }
@@ -763,7 +813,7 @@ export class CandidateIntakeService {
     const email = (overrides?.email && overrides.email.trim().toLowerCase()) || item.email || `inbox-${itemId}@example.com`
 
     const now = new Date().toISOString()
-    const inserted = (await db
+    const [inserted]: (ApplicantRow | undefined)[] = await db
       .insert(applicants)
       .values({
         organizationId: orgId,
@@ -788,11 +838,15 @@ export class CandidateIntakeService {
         screeningExpYears: null,
       })
       .returning()
-      .get()) as any
 
+    if (!inserted) {
+      throw new Error(`Failed to create applicant for inbox item #${itemId}`)
+    }
+
+    const resumeUrl = `/api/applicants/${inserted.id}/resume`
     await db
       .update(applicants)
-      .set({ resumeUrl: `/api/applicants/${inserted.id}/resume` })
+      .set({ resumeUrl })
       .where(eq(applicants.id, inserted.id))
 
     await db
@@ -805,25 +859,53 @@ export class CandidateIntakeService {
         user: 'HR Admin',
         timestamp: now,
       })
-      .run()
 
     await db
       .update(inboxItems)
       .set({ status: 'promoted', promotedApplicantId: inserted.id })
       .where(and(eq(inboxItems.id, itemId), eq(inboxItems.organizationId, orgId)))
-      .run()
+
+    const canonicalApplicant: CanonicalPromotedApplicant = {
+      id: inserted.id,
+      jobId: inserted.jobId,
+      job_id: inserted.jobId,
+      organizationId: inserted.organizationId,
+      organization_id: inserted.organizationId,
+      name: inserted.name,
+      email: inserted.email,
+      phone: inserted.phone ?? '',
+      source: inserted.source ?? 'Inbox',
+      status: inserted.status,
+      resumeUrl,
+      resume_url: resumeUrl,
+      resumeFilename: inserted.resumeFilename,
+      resume_filename: inserted.resumeFilename,
+      resumeKeywords: inserted.resumeKeywords,
+      resume_keywords: inserted.resumeKeywords,
+      screeningStatus: inserted.screeningStatus,
+      screening_status: inserted.screeningStatus,
+      screeningSummary: inserted.screeningSummary,
+      screening_summary: inserted.screeningSummary,
+      screeningScore: inserted.screeningScore,
+      screening_score: inserted.screeningScore,
+      screeningBand: inserted.screeningBand,
+      screening_band: inserted.screeningBand,
+      screeningVerdict: inserted.screeningVerdict,
+      screening_verdict: inserted.screeningVerdict,
+      screeningMatched: inserted.screeningMatched,
+      screening_matched: inserted.screeningMatched,
+      screeningMissing: inserted.screeningMissing,
+      screening_missing: inserted.screeningMissing,
+      screeningExpYears: inserted.screeningExpYears,
+      screening_exp_years: inserted.screeningExpYears,
+      createdAt: inserted.createdAt,
+      created_at: inserted.createdAt,
+      updatedAt: inserted.updatedAt,
+      updated_at: inserted.updatedAt,
+    }
 
     return {
-      applicant: {
-        id: inserted.id,
-        organization_id: inserted.organizationId,
-        job_id: inserted.jobId,
-        name: inserted.name,
-        email: inserted.email,
-        status: inserted.status,
-        screening_score: inserted.screeningScore,
-        screening_band: inserted.screeningBand,
-      },
+      applicant: canonicalApplicant,
       inboxItemId: itemId,
     }
   }

@@ -47,6 +47,21 @@ export class CorruptedFileError extends Error {
   }
 }
 
+/**
+ * Checks whether an error represents a corrupted/unreadable file error.
+ */
+export function isCorruptedFileError(error: unknown): boolean {
+  if (!error) return false
+  if (error instanceof CorruptedFileError) return true
+  if (typeof error === 'object') {
+    const err = error as { name?: string; code?: string; message?: string }
+    if (err.name === 'CorruptedFileError') return true
+    if (err.code === 'CORRUPTED_FILE') return true
+    if (typeof err.message === 'string' && /corrupt/i.test(err.message)) return true
+  }
+  return false
+}
+
 // ============================================================================
 // LLM Provider Port & Adapter Architecture
 // ============================================================================

@@ -43,7 +43,7 @@ export class BatchQueueService {
     const { db } = await import('../db')
     const { eq } = await import('drizzle-orm')
 
-    const jobRow = (await db.select().from(jobs).where(eq(jobs.id, jobId)).get()) as any
+    const [jobRow] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1)
     const jobTitle = jobRow?.title || 'Posisi Pekerjaan'
 
     for (const item of itemsToProcess) {
@@ -72,7 +72,7 @@ export class BatchQueueService {
     const { db } = await import('../db')
     const { eq } = await import('drizzle-orm')
 
-    const job = (await db.select().from(jobs).where(eq(jobs.id, jobId)).get()) as any
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1)
     const orgId = job?.organizationId || 0
     return candidateIntakeService.getBatchProgress(orgId, jobId)
   }

@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm'
 import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { getWallet } from '../services/walletService'
 import { candidateIntakeService } from '../services/candidateIntakeService'
+import { isCorruptedFileError } from '../services/aiScreeningService'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
@@ -78,10 +79,7 @@ resumeRouter.post('/:id/resume', async (c) => {
         )
       }
 
-      const isCorrupt =
-        intakeErr.name === 'CorruptedFileError' ||
-        intakeErr.code === 'CORRUPTED_FILE' ||
-        /corrupt/i.test(intakeErr?.message || '')
+      const isCorrupt = isCorruptedFileError(intakeErr)
 
       if (isCorrupt) {
         return c.json(
