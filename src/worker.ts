@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { initCloudflareD1 } from './db'
 import { initDocumentStorage } from './services/documentStorage'
+import { candidateIntakeService, CloudflareQueueAdapter } from './services/candidateIntakeService'
 import { DEFAULT_WORKER_ORIGIN, resolveAllowedOrigins } from './config/origins'
 import { orgMiddleware } from './middleware/orgContext'
 import { jobsRouter } from './api/jobs'
@@ -41,6 +42,9 @@ app.use('*', async (c, next) => {
   if (c.env?.CV_STORAGE) {
     initDocumentStorage(c.env.CV_STORAGE)
   }
+  if (c.env?.CV_QUEUE) {
+    candidateIntakeService.setQueuePort(new CloudflareQueueAdapter(c.env.CV_QUEUE))
+  }
   await next()
 })
 app.use('/api/*', orgMiddleware)
@@ -79,10 +83,19 @@ export default {
     if (env.CV_STORAGE) {
       initDocumentStorage(env.CV_STORAGE)
     }
+    if (env.CV_QUEUE) {
+      candidateIntakeService.setQueuePort(new CloudflareQueueAdapter(env.CV_QUEUE))
+    }
     console.log(`[Cloudflare Queue Worker] Received batch of ${batch.messages.length} messages`)
     for (const message of batch.messages) {
-      console.log(`Processing message ${message.id}:`, message.body)
-      message.ack()
+      try {
+        console.log(`Processing message ${message.id}:`, message.body)
+        await candidateIntakeService.consumeQueueMessage(message.body)
+        message.ack()
+      } catch (err) {
+        console.error(`Error processing queue message ${message.id}:`, err)
+        message.retry()
+      }
     }
   }
 }
