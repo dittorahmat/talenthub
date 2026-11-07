@@ -4,7 +4,7 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { reserveCredit, commitCredit, refundCredit, getWallet } from './walletService'
 import { evaluateResume, isCorruptedOrUnreadableBuffer } from './aiScreeningService'
-import { mockScreening, hashInt, verdictFor, rationaleFor, KEYWORD_POOL } from '../api/screening'
+import { mockScreening, hashInt, verdictFor, rationaleFor, KEYWORD_POOL, extractKeywords } from '../api/screening'
 import { contentTypeForFilename, deleteDocuments, putDocument } from './documentStorage'
 
 export interface BatchItemInput {
@@ -46,11 +46,6 @@ function sanitizeName(filename: string): string {
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ')
-}
-
-function extractKeywords(text: string): string[] {
-  const lower = text.toLowerCase()
-  return KEYWORD_POOL.filter((kw) => lower.includes(kw.toLowerCase()))
 }
 
 // In-memory active batch status tracking (simulates Cloudflare Queues state and worker dispatcher)

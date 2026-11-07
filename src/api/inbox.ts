@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { db } from '../db'
 import { applicants, jobs, inboxItems, jobKnockouts, activities } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
-import { mockScreening, KEYWORD_POOL, hashInt, verdictFor, rationaleFor } from './screening'
+import { mockScreening, KEYWORD_POOL, extractKeywords, hashInt, verdictFor, rationaleFor } from './screening'
 import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { BatchQueueService, BatchItemInput } from '../services/batchQueueService'
 import { getDocument } from '../services/documentStorage'
@@ -13,11 +13,6 @@ const MAX_BATCH_BYTES = 25 * 1024 * 1024
 const ALLOWED_EXTS = ['pdf', 'docx', 'doc', 'txt'] as const
 
 export const inboxRouter = new Hono<OrgEnv>()
-
-function extractKeywords(text: string): string[] {
-  const lower = text.toLowerCase()
-  return KEYWORD_POOL.filter((kw) => lower.includes(kw.toLowerCase()))
-}
 
 function sanitizeName(filename: string): string {
   const base = filename.replace(/\.[^.]+$/, '')

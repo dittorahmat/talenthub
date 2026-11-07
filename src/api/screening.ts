@@ -24,18 +24,42 @@ export const KEYWORD_POOL = [
   'Redis', 'Linux', 'Figma', 'UI/UX', 'Product Design', 'Management', 'Agile', 'Scrum'
 ]
 
-function requiredForJob(jobTitle: string): string[] {
+/**
+ * Extracts recognized technical keywords from raw text against the canonical KEYWORD_POOL.
+ */
+export function extractKeywords(text: string): string[] {
+  const lower = text.toLowerCase()
+  return KEYWORD_POOL.filter(kw => lower.includes(kw.toLowerCase()))
+}
+
+/**
+ * Resolves required skills based on explicit requirements or job title defaults.
+ */
+export function requiredForJob(jobTitle: string, jobRequirements?: string[] | string): string[] {
+  if (Array.isArray(jobRequirements) && jobRequirements.length > 0) {
+    return jobRequirements
+  }
+  if (typeof jobRequirements === 'string' && jobRequirements.trim().length > 0) {
+    return jobRequirements.split(',').map(s => s.trim()).filter(Boolean)
+  }
+
   const t = jobTitle.toLowerCase()
-  if (t.includes('frontend')) {
+  if (t.includes('frontend') || t.includes('front-end') || t.includes('react')) {
     return ['React', 'TypeScript', 'JavaScript', 'Node.js', 'Git', 'CI/CD']
   }
-  if (t.includes('designer') || t.includes('product design')) {
-    return ['Figma', 'UI/UX', 'Product Design']
+  if (t.includes('backend') || t.includes('back-end') || t.includes('api')) {
+    return ['Node.js', 'TypeScript', 'SQL', 'PostgreSQL', 'Docker', 'Git']
   }
-  if (t.includes('devops')) {
-    return ['Docker', 'Kubernetes', 'AWS', 'Linux', 'CI/CD']
+  if (t.includes('fullstack') || t.includes('full-stack')) {
+    return ['React', 'Node.js', 'TypeScript', 'SQL', 'Git', 'Docker']
   }
-  return ['React', 'TypeScript', 'JavaScript', 'Node.js', 'Git', 'CI/CD']
+  if (t.includes('designer') || t.includes('ui') || t.includes('ux') || t.includes('product design')) {
+    return ['Figma', 'UI/UX', 'Product Design', 'Agile']
+  }
+  if (t.includes('devops') || t.includes('sre') || t.includes('cloud')) {
+    return ['Docker', 'Kubernetes', 'AWS', 'Linux', 'CI/CD', 'Git']
+  }
+  return ['JavaScript', 'TypeScript', 'Git', 'SQL', 'Agile']
 }
 
 export function hashInt(n: number): number {
