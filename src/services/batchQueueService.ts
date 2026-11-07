@@ -351,7 +351,6 @@ export class BatchQueueService {
         orgId,
         `batch-inbox-${itemId}`,
         `Screening batch CV ${candidateName} (${filename})`,
-        1
       )
 
       // 3. READY

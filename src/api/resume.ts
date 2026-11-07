@@ -4,8 +4,8 @@ import { applicants, activities, jobs } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { OrgEnv } from '../middleware/orgContext'
-import { getWallet, reserveCredit, commitCredit, refundCredit } from '../services/walletService'
-import { evaluateResume, isCorruptedOrUnreadableBuffer } from '../services/aiScreeningService'
+import { getWallet, executeMetered } from '../services/walletService'
+import { evaluateResume, isCorruptedOrUnreadableBuffer, CorruptedFileError } from '../services/aiScreeningService'
 import { contentTypeForFilename, deleteDocument, putDocument } from '../services/documentStorage'
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
@@ -45,16 +45,6 @@ resumeRouter.post('/:id/resume', async (c) => {
       return c.json({ error: 'File too large (max 5MB)' }, 400)
     }
 
-    // 2. Atomically reserve 1 credit
-    try {
-      await reserveCredit(orgId, 1, `AI Screening untuk pelamar: ${applicant.name}`)
-    } catch (err: any) {
-      return c.json({
-        error: 'INSUFFICIENT_CREDIT',
-        message: 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.'
-      }, 402)
-    }
-
     const filename = `${id}-${randomUUID()}.${ext}`
     const storageKey = `orgs/${orgId}/applicants/${id}/${filename}`
     const resumeUrl = `/api/applicants/${id}/resume`
@@ -88,112 +78,136 @@ resumeRouter.post('/:id/resume', async (c) => {
       timestamp: now,
     })
 
-    // Check if the file is unreadable / corrupted
-    const isCorrupt = isCorruptedOrUnreadableBuffer(buffer, file.name)
-    if (isCorrupt) {
-      // Automatic refund
-      await refundCredit(
+    try {
+      const { result } = await executeMetered(
         orgId,
         1,
-        'REFUND_CORRUPTED_FILE',
-        'Pengembalian 1 kredit karena file CV rusak atau tidak terbaca'
+        `AI Screening untuk pelamar: ${applicant.name}`,
+        async () => {
+          // Check if the file is unreadable / corrupted
+          const isCorrupt = isCorruptedOrUnreadableBuffer(buffer, file.name)
+          if (isCorrupt) {
+            throw new CorruptedFileError('File CV rusak atau tidak terbaca')
+          }
+
+          // Fetch related job title
+          const jobRow = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
+          const jobTitle = jobRow?.title || 'Posisi Terkait'
+
+          // Perform AI screening evaluation
+          const evaluation = await evaluateResume({
+            resumeBuffer: buffer,
+            jobTitle,
+            applicantName: applicant.name
+          })
+
+          const matchedStr = evaluation.matchedSkills.join(', ') || null
+          const missingStr = evaluation.missingSkills.join(', ') || null
+          const keywordsStr = matchedStr
+
+          const completionTime = new Date().toISOString()
+          await db.update(applicants).set({
+            resumeKeywords: keywordsStr,
+            screeningStatus: 'ready',
+            screeningSummary: evaluation.summary,
+            screeningScore: evaluation.score,
+            screeningBand: evaluation.band,
+            screeningVerdict: evaluation.verdict,
+            screeningMatched: matchedStr,
+            screeningMissing: missingStr,
+            screeningExpYears: evaluation.expYears,
+            updatedAt: completionTime,
+          }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+
+          await db.insert(activities).values({
+            organizationId: orgId,
+            applicantId: id,
+            type: 'screening_complete',
+            description: `Screening AI selesai (${evaluation.provider}): Skor ${evaluation.score}/100 (${evaluation.band} - ${evaluation.verdict})`,
+            user: 'AI Screening System',
+            timestamp: completionTime,
+          })
+
+          return {
+            evaluation,
+            keywordsStr,
+          }
+        }
       )
 
-      const errorSummary = 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke saldo dompet.'
-      const errorTime = new Date().toISOString()
-
-      // A corrupt upload must not linger in private storage.
-      await deleteDocument(storageKey)
-
-      await db.update(applicants).set({
-        resumeUrl: null,
-        resumePath: null,
-        screeningStatus: 'error',
-        screeningVerdict: 'Error',
-        screeningSummary: errorSummary,
-        screeningScore: null,
-        screeningBand: 'Weak',
-        updatedAt: errorTime,
-      }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
-
-      await db.insert(activities).values({
-        organizationId: orgId,
-        applicantId: id,
-        type: 'screening_failed',
-        description: `Screening gagal: File rusak / tidak terbaca. 1 kredit otomatis dikembalikan ke dompet.`,
-        user: 'AI Screening System',
-        timestamp: errorTime,
-      })
-
       return c.json({
-        success: false,
-        error: 'CORRUPTED_FILE',
-        message: 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke dompet Anda.',
-        screening_status: 'error',
-        screening_verdict: 'Error',
-        screening_summary: errorSummary,
-        refunded: true,
-      }, 422)
-    }
-
-    // Normal successful flow: Commit the deduction
-    await commitCredit(orgId, String(applicant.id), `AI Screening untuk pelamar: ${applicant.name}`)
-
-    // Fetch related job title
-    const jobRow = await db.select().from(jobs).where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, orgId))).get()
-    const jobTitle = jobRow?.title || 'Posisi Terkait'
-
-    // Perform AI screening evaluation
-    const evaluation = await evaluateResume({
-      resumeBuffer: buffer,
-      jobTitle,
-      applicantName: applicant.name
-    })
-
-    const matchedStr = evaluation.matchedSkills.join(', ') || null
-    const missingStr = evaluation.missingSkills.join(', ') || null
-    const keywordsStr = matchedStr
-
-    const completionTime = new Date().toISOString()
-    await db.update(applicants).set({
-      resumeKeywords: keywordsStr,
-      screeningStatus: 'ready',
-      screeningSummary: evaluation.summary,
-      screeningScore: evaluation.score,
-      screeningBand: evaluation.band,
-      screeningVerdict: evaluation.verdict,
-      screeningMatched: matchedStr,
-      screeningMissing: missingStr,
-      screeningExpYears: evaluation.expYears,
-      updatedAt: completionTime,
-    }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
-
-    await db.insert(activities).values({
-      organizationId: orgId,
-      applicantId: id,
-      type: 'screening_complete',
-      description: `Screening AI selesai (${evaluation.provider}): Skor ${evaluation.score}/100 (${evaluation.band} - ${evaluation.verdict})`,
-      user: 'AI Screening System',
-      timestamp: completionTime,
-    })
-
-    return c.json({
-      success: true,
-      resume_url: resumeUrl,
-      resume_filename: file.name,
-      resume_keywords: keywordsStr,
-      screening_status: 'ready',
-      screening: {
-        score: evaluation.score,
-        summary: evaluation.summary,
-        band: evaluation.band,
-        verdict: evaluation.verdict,
-        matchedSkills: evaluation.matchedSkills,
-        missingSkills: evaluation.missingSkills,
-        expYears: evaluation.expYears,
-        provider: evaluation.provider
+        success: true,
+        resume_url: resumeUrl,
+        resume_filename: file.name,
+        resume_keywords: result.keywordsStr,
+        screening_status: 'ready',
+        screening: {
+          score: result.evaluation.score,
+          summary: result.evaluation.summary,
+          band: result.evaluation.band,
+          verdict: result.evaluation.verdict,
+          matchedSkills: result.evaluation.matchedSkills,
+          missingSkills: result.evaluation.missingSkills,
+          expYears: result.evaluation.expYears,
+          provider: result.evaluation.provider
+        }
+      })
+    } catch (meteredErr: any) {
+      if (
+        meteredErr.message === 'Insufficient credit balance' ||
+        meteredErr.code === 'INSUFFICIENT_CREDIT'
+      ) {
+        return c.json({
+          error: 'INSUFFICIENT_CREDIT',
+          message: 'Saldo kredit tidak mencukupi untuk melakukan AI screening. Silakan Top Up terlebih dahulu.'
+        }, 402)
       }
-    })
+
+      const isCorrupt =
+        meteredErr instanceof CorruptedFileError ||
+        meteredErr?.name === 'CorruptedFileError' ||
+        /corrupt/i.test(meteredErr?.message || '')
+
+      if (isCorrupt) {
+        const errorSummary = 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke saldo dompet.'
+        const errorTime = new Date().toISOString()
+
+        // A corrupt upload must not linger in private storage.
+        await deleteDocument(storageKey)
+
+        await db.update(applicants).set({
+          resumeUrl: null,
+          resumePath: null,
+          screeningStatus: 'error',
+          screeningVerdict: 'Error',
+          screeningSummary: errorSummary,
+          screeningScore: null,
+          screeningBand: 'Weak',
+          updatedAt: errorTime,
+        }).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+
+        await db.insert(activities).values({
+          organizationId: orgId,
+          applicantId: id,
+          type: 'screening_failed',
+          description: `Screening gagal: File rusak / tidak terbaca. 1 kredit otomatis dikembalikan ke dompet.`,
+          user: 'AI Screening System',
+          timestamp: errorTime,
+        })
+
+        return c.json({
+          success: false,
+          error: 'CORRUPTED_FILE',
+          message: 'File CV rusak atau tidak terbaca. 1 Kredit telah dikembalikan ke dompet Anda.',
+          screening_status: 'error',
+          screening_verdict: 'Error',
+          screening_summary: errorSummary,
+          refunded: true,
+        }, 422)
+      }
+
+      throw meteredErr
+    }
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
   }

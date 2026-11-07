@@ -7,7 +7,7 @@ import { sessionHeadersFor } from './helpers/auth'
 
 const org1Headers = await sessionHeadersFor(1)
 const org2Headers = await sessionHeadersFor(2)
-import { addCredit, getWallet, reserveCredit, refundCredit, commitCredit } from '../src/services/walletService'
+import { addCredit, getWallet, reserveCredit, refundCredit, commitCredit, executeMetered } from '../src/services/walletService'
 
 describe('Atomic Reserve and Refund on Failure Integration Tests', () => {
   const orgId = 1
@@ -210,5 +210,72 @@ Fullstack Engineer
     // Net balance unchanged
     const finalBalance = (await getWallet(orgId)).balance
     expect(finalBalance).toBe(initialBalance)
+  })
+
+  it('verifies executeMetered unit-of-work succeeds, commits SETTLED audit row, and debits balance once', async () => {
+    const initialWallet = await getWallet(orgId)
+    const initialBalance = initialWallet.balance
+
+    const res = await executeMetered(
+      orgId,
+      3,
+      'Unit of work metered test action',
+      async () => {
+        // Balance during execution should already be debited by 3
+        const currentWallet = await getWallet(orgId)
+        expect(currentWallet.balance).toBe(initialBalance - 3)
+        return { payload: 'screening-ok' }
+      }
+    )
+
+    expect(res.result.payload).toBe('screening-ok')
+    expect(res.transaction.type).toBe('SETTLED')
+    expect(res.transaction.amount).toBe(0)
+
+    const finalWallet = await getWallet(orgId)
+    expect(finalWallet.balance).toBe(initialBalance - 3)
+  })
+
+  it('verifies executeMetered unit-of-work automatically refunds on failure', async () => {
+    const initialWallet = await getWallet(orgId)
+    const initialBalance = initialWallet.balance
+
+    // 1. Failure with CorruptedFileError -> REFUND_CORRUPTED_FILE
+    let caughtErr: any = null
+    try {
+      await executeMetered(
+        orgId,
+        2,
+        'Metered action with corrupted file',
+        async () => {
+          throw new Error('File corrupted or unreadable buffer test')
+        }
+      )
+    } catch (err) {
+      caughtErr = err
+    }
+
+    expect(caughtErr).toBeDefined()
+    const balanceAfterCorrupt = (await getWallet(orgId)).balance
+    expect(balanceAfterCorrupt).toBe(initialBalance)
+
+    // 2. Failure with generic processing error -> REFUND_PROCESSING_ERROR
+    let caughtProcessingErr: any = null
+    try {
+      await executeMetered(
+        orgId,
+        2,
+        'Metered action with system failure',
+        async () => {
+          throw new Error('Third party AI timeout exception')
+        }
+      )
+    } catch (err) {
+      caughtProcessingErr = err
+    }
+
+    expect(caughtProcessingErr).toBeDefined()
+    const balanceAfterError = (await getWallet(orgId)).balance
+    expect(balanceAfterError).toBe(initialBalance)
   })
 })
