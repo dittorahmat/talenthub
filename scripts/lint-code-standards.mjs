@@ -39,11 +39,15 @@ scanDirectory(join(process.cwd(), 'src'), (filePath) => {
         reason: `AI Slop Color Palette (Purple/Indigo default) detected in ${relPath}. Wajib gunakan Light Slate & Teal.`
       })
     }
-    // Check for inline style usage in newly introduced or refactored components
+    // Check for inline style usage in components (excluding legacy LandingPage/LoginPage)
     if (
       (relPath.includes('CandidateCard.tsx') ||
        relPath.includes('AddCandidateForm.tsx') ||
-       relPath.includes('ScreeningInbox.tsx')) &&
+       relPath.includes('ScreeningInbox.tsx') ||
+       relPath.includes('CandidateScorecardTab.tsx') ||
+       relPath.includes('OutreachTemplateModal.tsx') ||
+       relPath.includes('CandidateDetailModal.tsx') ||
+       relPath.includes('PublicCareerPage.tsx')) &&
       /<(a|button)\b[^>]*\bstyle=\{\{/i.test(line)
     ) {
       VIOLATIONS.push({
@@ -51,6 +55,29 @@ scanDirectory(join(process.cwd(), 'src'), (filePath) => {
         line: idx + 1,
         reason: `Inline style soup detected on interactive element in ${relPath}. Wajib gunakan utility classes Tailwind v4.`
       })
+    }
+  })
+})
+
+// 1b. Check for banned in-memory state (new Map, new Set) at module root level in serverless API routes on Edge
+scanDirectory(join(process.cwd(), 'src/api'), (filePath) => {
+  if (!filePath.endsWith('.ts')) return
+  const relPath = filePath.replace(process.cwd(), '').replace(/^[\\\/]/, '')
+  const content = readFileSync(filePath, 'utf-8')
+  const fileLines = content.split('\n')
+  fileLines.forEach((line, idx) => {
+    // Only flag lines with 0 leading indentation (module scope variables)
+    if (/^[a-zA-Z]/.test(line)) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) return
+      if (line.includes('// allow-in-memory')) return
+      if (/^(const|let|var)\s+\w+\s*=\s*new\s+(Map|Set)\b/.test(trimmed)) {
+        VIOLATIONS.push({
+          file: filePath,
+          line: idx + 1,
+          reason: `Banned Module-Level In-Memory State on Edge detected in ${relPath}: "${trimmed}". Cloudflare Workers memori isolate bersifat ephemeral dan terisolasi per-PoP. Gunakan D1/KV atau Turnstile, atau tandai "// allow-in-memory" jika aman.`
+        })
+      }
     }
   })
 })
