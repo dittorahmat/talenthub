@@ -367,6 +367,77 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // TalentHubClient Implementation
 // ----------------------------------------------------
 
+export interface ScorecardItem {
+  id: number
+  applicantId: number
+  organizationId: number
+  evaluatorId: string
+  evaluatorName: string
+  technicalScore: number
+  cultureScore: number
+  communicationScore: number
+  recommendation: 'Strong Yes' | 'Yes' | 'Neutral' | 'No'
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ScorecardAggregate {
+  count: number
+  avgTechnical: number
+  avgCulture: number
+  avgCommunication: number
+  avgOverall: number
+}
+
+export interface ScorecardResponse {
+  scorecards: ScorecardItem[]
+  aggregate: ScorecardAggregate
+}
+
+export interface CreateScorecardInput {
+  technicalScore: number
+  cultureScore: number
+  communicationScore: number
+  recommendation: 'Strong Yes' | 'Yes' | 'Neutral' | 'No'
+  notes?: string
+}
+
+export interface CandidateNoteItem {
+  id: number
+  applicantId: number
+  organizationId: number
+  authorId: string
+  authorName: string
+  content: string
+  createdAt: string
+}
+
+export interface OutreachTemplateItem {
+  id: number
+  organizationId: number
+  name: string
+  channel: 'whatsapp' | 'email'
+  subject?: string | null
+  body: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateOutreachTemplateInput {
+  name: string
+  channel: 'whatsapp' | 'email'
+  subject?: string
+  body: string
+}
+
+export interface UpdateOutreachTemplateInput {
+  name?: string
+  channel?: 'whatsapp' | 'email'
+  subject?: string
+  body?: string
+}
+
 export const TalentHubClient = {
   jobs: {
     list: (): Promise<Job[]> => {
@@ -495,6 +566,58 @@ export const TalentHubClient = {
     },
     getPackages: (): Promise<BillingPackage[]> => {
       return request<BillingPackage[]>('/api/billing/packages')
+    },
+  },
+
+  templates: {
+    list: (channel?: 'whatsapp' | 'email'): Promise<OutreachTemplateItem[]> => {
+      const q = channel ? `?channel=${channel}` : ''
+      return request<OutreachTemplateItem[]>(`/api/templates${q}`)
+    },
+    create: (input: CreateOutreachTemplateInput): Promise<OutreachTemplateItem> => {
+      return request<OutreachTemplateItem>('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+    },
+    update: (id: number, input: UpdateOutreachTemplateInput): Promise<OutreachTemplateItem> => {
+      return request<OutreachTemplateItem>(`/api/templates/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+    },
+    delete: (id: number): Promise<{ success: boolean; message: string }> => {
+      return request<{ success: boolean; message: string }>(`/api/templates/${id}`, {
+        method: 'DELETE',
+      })
+    },
+  },
+
+  scorecards: {
+    get: (applicantId: number): Promise<ScorecardResponse> => {
+      return request<ScorecardResponse>(`/api/applicants/${applicantId}/scorecards`)
+    },
+    create: (applicantId: number, input: CreateScorecardInput): Promise<ScorecardItem> => {
+      return request<ScorecardItem>(`/api/applicants/${applicantId}/scorecards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+    },
+  },
+
+  teamNotes: {
+    list: (applicantId: number): Promise<CandidateNoteItem[]> => {
+      return request<CandidateNoteItem[]>(`/api/applicants/${applicantId}/team-notes`)
+    },
+    create: (applicantId: number, content: string): Promise<CandidateNoteItem> => {
+      return request<CandidateNoteItem>(`/api/applicants/${applicantId}/team-notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
     },
   },
 }

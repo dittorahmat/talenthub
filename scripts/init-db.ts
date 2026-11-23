@@ -3,6 +3,7 @@ import { sqlite } from '../src/db'
 sqlite.exec(`
   DROP TABLE IF EXISTS credit_transactions;
   DROP TABLE IF EXISTS credit_wallets;
+  DROP TABLE IF EXISTS candidate_share_tokens;
   DROP TABLE IF EXISTS inbox_items;
   DROP TABLE IF EXISTS job_knockouts;
   DROP TABLE IF EXISTS activities;
@@ -178,6 +179,15 @@ sqlite.exec(`
     expires_at INTEGER NOT NULL,
     created_at INTEGER,
     updated_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS candidate_share_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
   );
 `)
 

@@ -212,6 +212,19 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           >
             {rawScore}% · {rawBand}{derivedVerdict ? ` · ${derivedVerdict}` : ''}
           </span>
+        ) : candidate.resume_filename ? (
+          <span
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '12px',
+              background: '#F1F5F9',
+              color: '#64748B',
+            }}
+          >
+            Menunggu Skrining
+          </span>
         ) : null}
       </div>
 

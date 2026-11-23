@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import server from '../src/server'
 import { db } from '../src/db'
-import { applicants, jobs, organizations, creditWallets, inboxItems } from '../src/db/schema'
+import { applicants, jobs, organizations, creditWallets, inboxItems, candidateShareTokens } from '../src/db/schema'
 import { eq } from 'drizzle-orm'
 import { addCredit } from '../src/services/walletService'
 import { BatchQueueService } from '../src/services/batchQueueService'
@@ -78,7 +78,7 @@ describe('Private candidate document storage', () => {
     )
     expect(anonymous.status).toBe(401)
 
-    // The share token is the only public credential, and it serves the document.
+    // The share token is the only public credential, and it serves the document and summary.
     const shareRes = await server.fetch(
       new Request(`http://localhost:3001/api/applicants/${applicantId}/share-token`, {
         method: 'POST',
@@ -87,6 +87,14 @@ describe('Private candidate document storage', () => {
     )
     expect(shareRes.status).toBe(200)
     const share = (await shareRes.json()) as { token: string }
+
+    const shareSummary = await server.fetch(
+      new Request(`http://localhost:3001/api/applicants/public/share/${share.token}`),
+    )
+    expect(shareSummary.status).toBe(200)
+    const summaryData = (await shareSummary.json()) as { name: string; jobTitle: string }
+    expect(summaryData.name).toBe('Storage Owner')
+
     const shareDoc = await server.fetch(
       new Request(`http://localhost:3001/api/applicants/public/share/${share.token}/resume`),
     )
@@ -98,7 +106,20 @@ describe('Private candidate document storage', () => {
     )
     expect(bogusShare.status).toBe(404)
 
-    // Deleting the applicant removes the stored object.
+    // Expired share token returns 404
+    await db.insert(candidateShareTokens).values({
+      token: 'expired-test-token',
+      applicantId,
+      organizationId: 1,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+      createdAt: new Date(Date.now() - 10000).toISOString(),
+    })
+    const expiredShare = await server.fetch(
+      new Request('http://localhost:3001/api/applicants/public/share/expired-test-token'),
+    )
+    expect(expiredShare.status).toBe(404)
+
+    // Deleting the applicant removes the stored object and invalidates public share tokens.
     const deleted = await server.fetch(
       new Request(`http://localhost:3001/api/applicants/${applicantId}`, {
         method: 'DELETE',
@@ -110,6 +131,16 @@ describe('Private candidate document storage', () => {
       new Request(`http://localhost:3001/api/applicants/${applicantId}/resume`, { headers: org1Headers }),
     )
     expect(afterDelete.status).toBe(404)
+
+    const afterDeleteShare = await server.fetch(
+      new Request(`http://localhost:3001/api/applicants/public/share/${share.token}`),
+    )
+    expect(afterDeleteShare.status).toBe(404)
+
+    const afterDeleteShareDoc = await server.fetch(
+      new Request(`http://localhost:3001/api/applicants/public/share/${share.token}/resume`),
+    )
+    expect(afterDeleteShareDoc.status).toBe(404)
   })
 })
 
