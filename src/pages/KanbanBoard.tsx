@@ -108,6 +108,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
     }
   }
 
+  const handleScreenCandidate = async (candidate: Candidate) => {
+    try {
+      const res = await orgFetch(`/api/applicants/${candidate.id}/screen`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json() as any
+        alert(data.message || data.error || 'Gagal memproses skrining')
+        return
+      }
+      loadData()
+    } catch (err) {
+      console.error(err)
+      loadData()
+    }
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const found = candidates.find(c => c.id.toString() === active.id)
@@ -310,6 +325,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
                     onSelectCandidate={setSelectedCandidate}
                     onStatusChange={handleStatusChange}
                     onDeleteCandidate={handleDeleteCandidate}
+                    onScreenCandidate={handleScreenCandidate}
                   />
                 )
               })}

@@ -54,7 +54,7 @@ export interface SerializedUser {
   id: string
   name: string
   email: string
-  role: 'superadmin' | 'admin' | 'recruiter'
+  role: 'superadmin' | 'admin' | 'recruiter' | 'viewer'
   organizationId: number | null
   organization?: {
     id: number
@@ -68,7 +68,7 @@ export function serializeUser(u: any, org?: any): SerializedUser {
     id: u.id,
     name: u.name,
     email: u.email,
-    role: (u.role as 'superadmin' | 'admin' | 'recruiter') || 'recruiter',
+    role: (u.role as 'superadmin' | 'admin' | 'recruiter' | 'viewer') || 'recruiter',
     organizationId: u.organizationId ?? null,
     organization: org
       ? {

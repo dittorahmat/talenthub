@@ -13,6 +13,7 @@ interface StageColumnProps {
   onSelectCandidate: (candidate: Candidate) => void
   onStatusChange: (id: number, newStatus: string) => void
   onDeleteCandidate: (candidate: Candidate) => void
+  onScreenCandidate?: (candidate: Candidate) => void
 }
 
 export const StageColumn: React.FC<StageColumnProps> = ({
@@ -24,7 +25,8 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   onAddCandidateClick,
   onSelectCandidate,
   onStatusChange,
-  onDeleteCandidate
+  onDeleteCandidate,
+  onScreenCandidate,
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: stage })
 
@@ -107,6 +109,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
               onSelect={onSelectCandidate}
               onStatusChange={onStatusChange}
               onDelete={onDeleteCandidate}
+              onScreenCandidate={onScreenCandidate}
             />
           ))}
         </SortableContext>

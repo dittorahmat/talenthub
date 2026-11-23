@@ -246,7 +246,7 @@ describe('Anti-Abuse Free Trial Onboarding Tests', () => {
   })
 
   it('keys the trial rate limit on the platform client address', async () => {
-    const platformIp = `203.0.${100 + Math.floor(Math.random() * 100)}.${100 + Math.floor(Math.random() * 100)}`
+    const platformIp = `203.${10 + Math.floor(Math.random() * 200)}.${100 + Math.floor(Math.random() * 100)}.${100 + Math.floor(Math.random() * 100)}`
     const base = Date.now()
 
     for (let i = 0; i < 3; i += 1) {

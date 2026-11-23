@@ -13,6 +13,11 @@
   - Icon browser `favicon.ico` wajib berformat binary ICO standar, bukan teks SVG XML dengan ekstensi `.ico`.
   - Background queue handler (`queue(batch, env)`) dan request middleware wajib menginisialisasi D1 binding (`initCloudflareD1(env.DB)`) secara idempoten (cegah re-inisialisasi berulang jika instance DB sudah aktif).
   - Skema dan seed remote D1 wajib direproduksi melalui script versioned `scripts/seed-d1.ts` (`bun run seed:d1` / `bun run seed:d1:remote`) dan tersimpan di `data/d1-schema-seed.sql`.
+  - **No In-Memory State for Edge Distributed Operations**:
+    - DILARANG menggunakan in-process / in-memory collections (`new Map()`, `new Set()`, array global modul) untuk menyimpan token keamanan publik, link sharing, rate limiter IP, atau data sesi yang diakses oleh pengguna atau pihak luar.
+    - Pada arsitektur serverless Cloudflare Workers yang berjalan di edge PoP terdistribusi, memori lokal tidak tersinkronisasi antar-instance/region dan musnah saat isolate didaur ulang.
+    - Seluruh token keamanan (seperti `candidate_share_tokens`, session Better Auth, trial OTP claims) WAJIB dipersistensikan secara asinkron ke database Cloudflare D1 dengan field kedaluwarsa (`expires_at`), relasi tenant (`organization_id`), relasi entitas (`applicant_id`), dan mekanisme pembersihan kadaluarsa (opportunistic pruning).
+    - Rate limiter IP untuk endpoint publik wajib menggunakan persistensi D1/KV atau Cloudflare Turnstile token validation, dilarang menggunakan `Map` di memori isolate.
 - Untuk runtime local/test (Bun/Vite), sediakan adapter boundary transparan (`src/db/index.ts`) yang membaca binding Cloudflare saat berjalan di Worker, dan fallback ke sqlite/local filesystem hanya saat menjalankan unit test offline.
   - Parameter fungsi adapter seperti `initCloudflareD1(d1Instance: D1Database)` WAJIB menggunakan tipe data domain/Cloudflare kanonik (`D1Database`), bukan `any`.
 
@@ -27,9 +32,17 @@
   - Drizzle query yang berjalan di backend monolith Cloudflare Worker maupun test suite WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). DILARANG memanggil synchronous `.get()`, `.all()`, atau `.run()` secara langsung di route handlers maupun test fixtures karena tidak kompatibel dengan Cloudflare D1 runtime asli.
   - Autentikasi harus mengandalkan cryptographic hashing standar (seperti `bun:password` atau native PBKDF2/Argon2/bcrypt) dan dilarang keras menyimpan/membandingkan password plain text atau pseudo-string prefix.
   - Route terproteksi (seperti `/superadmin` dan API `/api/superadmin/*`) WAJIB memiliki session & role guard yang valid, menolak akses tanpa session token resmi dari Better Auth yang terverifikasi role-nya.
+- **Role-Based Collaboration Guard**:
+  - Mutasi penilaian kandidat (seperti submit Scorecard `/api/applicants/:id/scorecards` dan penambahan catatan tim `/api/applicants/:id/team-notes`) HANYA boleh dilakukan oleh role dengan hak evaluasi (`admin`, `recruiter`, `superadmin`, `owner`).
+  - Akun dengan role `viewer` bersifat *read-only* dan wajib ditolak dengan HTTP 403 jika mencoba memutasikan data evaluasi atau scorecard.
+- **Fail-Closed Scoping pada Public Shared Resources**:
+  - Seluruh query data pendukung saat meresolve token publik (`candidate_share_tokens`) WAJIB mengikatkan `organization_id` yang terverifikasi pada token tersebut (`and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId))`) guna mencegah eksploitasi data leaking lintas tenant.
 - Pendaftaran free trial wajib memverifikasi keunikan domain email korporat bahkan sebelum OTP diverifikasi, serta menerapkan IP rate-limiting untuk mencegah spamming OTP pada domain yang sama.
 - Fitur batch processing wajib menyediakan endpoint dan UI aksi pembatalan antrean (`cancel`) yang otomatis me-refund sisa kredit yang belum diproses.
-- Ringkasan kandidat wajib menyediakan secure tokenized public share link di samping opsi PDF dan WhatsApp.
+- **Tokenized Public Share Scoping & Edge Resilience**:
+  - Ringkasan kandidat wajib menyediakan secure tokenized public share link di samping opsi PDF dan WhatsApp.
+  - Token publik berbagi kandidat wajib dihasilkan menggunakan CSPRNG (min 16 byte hex), disimpan secara persisten di tabel Cloudflare D1 `candidate_share_tokens` dengan masa berlaku (TTL) tegas, terisolasi ke organisasi pemilik (`organization_id`), dan terhapus otomatis saat pelamar dihapus (`ON DELETE CASCADE`).
+  - Endpoint publik (`/api/applicants/public/share/:token`) HANYA boleh mengekspos intelligence summary yang aman untuk pewawancara, dilarang membocorkan data pribadi mentah yang tidak diizinkan.
 
 ## 4. Automated Verification & Guardrails
 - Sebelum menyelesaikan pekerjaan atau membuat PR/commit, agen WAJIB menjalankan:
@@ -117,3 +130,17 @@
     1. Dapatkah pembaca membayangkannya secara visual/nyata?
     2. Dapatkah klaim tersebut dibuktikan benar atau salah?
     3. Dapatkah kompetitor menulis kalimat yang sama persis (Swap Test)? Jika ya, pertajam dengan proposisi khas TalentHub.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown under `.scratch/` (no git remote). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles map 1:1 to label/status strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `GLOSSARY.md` and `docs/adr/` (plus optional `src/*/docs/adr/`). See `docs/agents/domain.md`.

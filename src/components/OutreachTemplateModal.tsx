@@ -213,7 +213,7 @@ export function OutreachTemplateModal({
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="text-xs font-semibold text-slate-700">Draf Pesan</label>
-              <span className="text-[11px] text-slate-400">Variabel: {'{{candidate_name}}'}, {'{{job_title}}'}, {'{{company_name}}'}</span>
+              <span className="text-[11px] text-slate-400">Variabel: {'{{candidate_name}}'}, {'{{job_title}}'}, {'{{company_name}}'}, {'{{interview_link}}'}</span>
             </div>
             <textarea
               rows={4}

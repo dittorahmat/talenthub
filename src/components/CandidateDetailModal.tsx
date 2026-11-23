@@ -827,7 +827,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
           </div>
 
           {/* Collaborative Scorecards & Team Activity Notes (Ticket 02) */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px' }}>
+          <div className="border border-slate-200 rounded-xl p-4">
             <CandidateScorecardTab
               applicantId={candidate.id}
               candidateName={candidate.name}
@@ -835,7 +835,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
           </div>
 
           {/* Activity Timeline Section */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px' }}>
+          <div className="border border-slate-200 rounded-xl p-4">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <ClockIcon size={16} color="#0D9488" />
               <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1E293B' }}>

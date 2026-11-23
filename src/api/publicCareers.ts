@@ -1,36 +1,16 @@
 import { Hono } from 'hono'
 import { db } from '../db'
 import { organizations, jobs, applicants, activities } from '../db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { putDocument, contentTypeForFilename } from '../services/documentStorage'
+import { parsePipelineStages } from '../utils/pipelineStages'
 import crypto from 'crypto'
 
 export const publicCareersRouter = new Hono()
 
-// Rate limit helper: simple IP tracking in memory per minute
-const publicIpLimiter = new Map<string, { count: number; resetAt: number }>()
-
-function checkIpRateLimit(ip: string, maxRequests = 20): boolean {
-  const now = Date.now()
-  const entry = publicIpLimiter.get(ip)
-  if (!entry || entry.resetAt < now) {
-    publicIpLimiter.set(ip, { count: 1, resetAt: now + 60 * 1000 })
-    return true
-  }
-  if (entry.count >= maxRequests) return false
-  entry.count++
-  return true
-}
-
 // 1. Get organization active jobs: GET /api/public/careers/:orgSlug
 publicCareersRouter.get('/:orgSlug', async (c) => {
   const orgSlug = c.req.param('orgSlug')
-  const clientIp = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1'
-
-  if (!checkIpRateLimit(clientIp, 60)) {
-    return c.json({ error: 'Terlalu banyak permintaan. Silakan coba kembali sesaat lagi.' }, 429)
-  }
-
   const orgRows = await db.select().from(organizations).where(eq(organizations.slug, orgSlug))
   const org = orgRows[0]
   if (!org) {
@@ -44,19 +24,14 @@ publicCareersRouter.get('/:orgSlug', async (c) => {
     .orderBy(desc(jobs.id))
 
   const publicJobs = jobRows.map((j) => {
-    let stages = null
-    if (j.pipelineStages) {
-      try {
-        stages = JSON.parse(j.pipelineStages)
-      } catch {}
-    }
+    const stages = parsePipelineStages(j.pipelineStages)
     return {
       id: j.id,
       title: j.title,
       location: j.location,
       remote: j.remote,
       posted_at: j.postedAt,
-      stages_count: stages ? stages.length : 5,
+      stages_count: stages.length,
     }
   })
 
@@ -107,11 +82,6 @@ publicCareersRouter.post('/:orgSlug/jobs/:jobId/apply', async (c) => {
   const jobId = Number(c.req.param('jobId'))
   if (isNaN(jobId)) return c.notFound()
 
-  const clientIp = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '127.0.0.1'
-  if (!checkIpRateLimit(clientIp, 15)) {
-    return c.json({ error: 'Terlalu banyak pengiriman lamaran dari jaringan Anda. Mohon tunggu sejenak.' }, 429)
-  }
-
   const orgRows = await db.select().from(organizations).where(eq(organizations.slug, orgSlug))
   const org = orgRows[0]
   if (!org) return c.json({ error: 'Perusahaan tidak ditemukan' }, 404)
@@ -140,6 +110,7 @@ publicCareersRouter.post('/:orgSlug/jobs/:jobId/apply', async (c) => {
   let resumePath: string | null = null
   let resumeFilename: string | null = null
   let resumeUrl: string | null = null
+  let fileBuffer: Buffer | null = null
 
   if (file && typeof file.name === 'string') {
     const ext = file.name.split('.').pop()?.toLowerCase()
@@ -148,6 +119,7 @@ publicCareersRouter.post('/:orgSlug/jobs/:jobId/apply', async (c) => {
     }
 
     const fileBytes = await file.arrayBuffer()
+    fileBuffer = Buffer.from(fileBytes)
     const uint8 = new Uint8Array(fileBytes)
     const randomHex = crypto.randomBytes(8).toString('hex')
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -158,19 +130,12 @@ publicCareersRouter.post('/:orgSlug/jobs/:jobId/apply', async (c) => {
 
     resumePath = key
     resumeFilename = file.name
-    resumeUrl = `/api/applicants/public/file/${key}`
+    resumeUrl = `/api/applicants/public/resume/${key}`
   }
 
-  // Determine initial stage
-  let initialStage = 'Applied'
-  if (job.pipelineStages) {
-    try {
-      const parsed = JSON.parse(job.pipelineStages)
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name) {
-        initialStage = parsed[0].name
-      }
-    } catch {}
-  }
+  // Determine initial stage using canonical parser
+  const stages = parsePipelineStages(job.pipelineStages)
+  const initialStage = stages[0]?.name || 'Applied'
 
   const now = new Date().toISOString()
   const insertedApplicant = await db
@@ -194,24 +159,41 @@ publicCareersRouter.post('/:orgSlug/jobs/:jobId/apply', async (c) => {
 
   const applicant = insertedApplicant[0]
 
-  // Optional: Auto-Screening trigger if enabled on job & balance available (Ticket 05)
-  if (job.autoScreenPublic && resumePath && file) {
+  // Credit Protection & Auto-Screening trigger if enabled on job (Ticket 05)
+  if (job.autoScreenPublic && resumePath && fileBuffer) {
     try {
-      const { getWallet } = await import('../services/walletService')
-      const wallet = await getWallet(org.id)
-      if (wallet.balance >= 1) {
-        const { candidateIntakeService } = await import('../services/candidateIntakeService')
-        const fileBytes = await file.arrayBuffer()
-        const buffer = Buffer.from(fileBytes)
-        await candidateIntakeService.submitSingleResume({
-          orgId: org.id,
-          jobId: job.id,
-          applicantId: applicant.id,
-          file: {
-            filename: file.name,
-            buffer,
-          },
-        })
+      const today = new Date().toISOString().split('T')[0]
+      const cap = job.dailyPublicScreeningCap || 20
+
+      // Count screened applicants today for this job
+      const screenedTodayCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(applicants)
+        .where(
+          and(
+            eq(applicants.jobId, job.id),
+            eq(applicants.organizationId, org.id),
+            eq(applicants.screeningStatus, 'ready'),
+            sql`date(${applicants.updatedAt}) = date(${today})`
+          )
+        )
+      const count = Number(screenedTodayCount[0]?.count || 0)
+
+      if (count < cap) {
+        const { getWallet } = await import('../services/walletService')
+        const wallet = await getWallet(org.id)
+        if (wallet.balance >= 1) {
+          const { candidateIntakeService } = await import('../services/candidateIntakeService')
+          await candidateIntakeService.submitSingleResume({
+            orgId: org.id,
+            jobId: job.id,
+            applicantId: applicant.id,
+            file: {
+              filename: file.name,
+              buffer: fileBuffer,
+            },
+          })
+        }
       }
     } catch (autoErr) {
       console.warn('Auto-screen public applicant error, left in pending state:', autoErr)

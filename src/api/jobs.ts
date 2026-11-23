@@ -4,6 +4,7 @@ import { jobs, applicants } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { BatchQueueService } from '../services/batchQueueService'
+import { parsePipelineStages } from '../utils/pipelineStages'
 
 export const jobsRouter = new Hono<OrgEnv>()
 
@@ -15,12 +16,7 @@ jobsRouter.get('/', async (c) => {
 
     const jobsWithCounts = allJobs.map(job => {
       const jobApplicants = allApplicants.filter(a => a.jobId === job.id)
-      let parsedStages = null
-      if (job.pipelineStages) {
-        try {
-          parsedStages = JSON.parse(job.pipelineStages)
-        } catch {}
-      }
+      const parsedStages = parsePipelineStages(job.pipelineStages)
       return {
         id: job.id,
         organization_id: job.organizationId,
@@ -67,12 +63,7 @@ jobsRouter.post('/', async (c) => {
       dailyPublicScreeningCap: typeof body.daily_public_screening_cap === 'number' ? body.daily_public_screening_cap : 20,
     }).returning().get()
 
-    let parsedStages = null
-    if (inserted.pipelineStages) {
-      try {
-        parsedStages = JSON.parse(inserted.pipelineStages)
-      } catch {}
-    }
+    const parsedStages = parsePipelineStages(inserted.pipelineStages)
 
     return c.json({
       id: inserted.id,
@@ -126,12 +117,7 @@ jobsRouter.put('/:id', async (c) => {
       .returning()
 
     const job = updated[0]
-    let parsedStages = null
-    if (job.pipelineStages) {
-      try {
-        parsedStages = JSON.parse(job.pipelineStages)
-      } catch {}
-    }
+    const parsedStages = parsePipelineStages(job.pipelineStages)
 
     return c.json({
       id: job.id,
@@ -202,12 +188,7 @@ jobsRouter.get('/:id', async (c) => {
       }
     })
 
-    let parsedStages = null
-    if (job.pipelineStages) {
-      try {
-        parsedStages = JSON.parse(job.pipelineStages)
-      } catch {}
-    }
+    const parsedStages = parsePipelineStages(job.pipelineStages)
 
     return c.json({
       id: job.id,

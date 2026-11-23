@@ -75,13 +75,13 @@ applicantsRouter.get('/public/share/:token', async (c) => {
   const applicantRows = await db
     .select()
     .from(applicants)
-    .where(eq(applicants.id, entry.applicantId))
+    .where(and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId)))
   const applicant = applicantRows[0] as any
   if (!applicant) return c.notFound()
   const jobRows = await db
     .select()
     .from(jobs)
-    .where(eq(jobs.id, applicant.jobId))
+    .where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, entry.organizationId)))
   const job = jobRows[0] as any
 
   const matched = applicant.screeningMatched ? applicant.screeningMatched.split(', ').filter(Boolean) : []
@@ -118,7 +118,7 @@ applicantsRouter.get('/public/share/:token/resume', async (c) => {
   const applicantRows = await db
     .select()
     .from(applicants)
-    .where(eq(applicants.id, entry.applicantId))
+    .where(and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId)))
   const applicant = applicantRows[0]
   if (!applicant || !applicant.resumePath) return c.notFound()
 
@@ -194,11 +194,11 @@ applicantsRouter.post('/:id/screen', async (c) => {
     const id = parseInt(c.req.param('id'))
     if (isNaN(id)) return c.notFound()
 
-    const applicant = await db
+    const applicantList = await db
       .select()
       .from(applicants)
       .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
-      .get()
+    const applicant = applicantList[0]
     if (!applicant) return c.notFound()
 
     if (!applicant.resumePath) {
@@ -587,6 +587,9 @@ applicantsRouter.get('/:id/scorecards', async (c) => {
 
 applicantsRouter.post('/:id/scorecards', async (c) => {
   const { orgId, user } = requireTenant(c)
+  if (user.role === 'viewer') {
+    return c.json({ error: 'Role viewer hanya memiliki akses baca (read-only)' }, 403)
+  }
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.notFound()
 
@@ -665,6 +668,9 @@ applicantsRouter.get('/:id/team-notes', async (c) => {
 
 applicantsRouter.post('/:id/team-notes', async (c) => {
   const { orgId, user } = requireTenant(c)
+  if (user.role === 'viewer') {
+    return c.json({ error: 'Role viewer hanya memiliki akses baca (read-only)' }, 403)
+  }
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.notFound()
 
