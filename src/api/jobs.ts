@@ -4,6 +4,7 @@ import { jobs, applicants } from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { BatchQueueService } from '../services/batchQueueService'
+import { parsePipelineStages } from '../utils/pipelineStages'
 
 export const jobsRouter = new Hono<OrgEnv>()
 
@@ -15,6 +16,7 @@ jobsRouter.get('/', async (c) => {
 
     const jobsWithCounts = allJobs.map(job => {
       const jobApplicants = allApplicants.filter(a => a.jobId === job.id)
+      const parsedStages = parsePipelineStages(job.pipelineStages)
       return {
         id: job.id,
         organization_id: job.organizationId,
@@ -22,6 +24,9 @@ jobsRouter.get('/', async (c) => {
         location: job.location,
         remote: job.remote,
         posted_at: job.postedAt,
+        pipeline_stages: parsedStages,
+        auto_screen_public: Boolean(job.autoScreenPublic),
+        daily_public_screening_cap: job.dailyPublicScreeningCap,
         applicantCount: jobApplicants.length
       }
     })
@@ -42,13 +47,23 @@ jobsRouter.post('/', async (c) => {
     }
 
     const postedAtDate = posted_at || new Date().toISOString().split('T')[0]
+    let serializedStages: string | null = null
+    if (body.pipeline_stages && Array.isArray(body.pipeline_stages)) {
+      serializedStages = JSON.stringify(body.pipeline_stages)
+    }
+
     const inserted = await db.insert(jobs).values({
       organizationId: orgId,
       title,
       location,
       remote: remote || 'No',
-      postedAt: postedAtDate
+      postedAt: postedAtDate,
+      pipelineStages: serializedStages,
+      autoScreenPublic: body.auto_screen_public ? true : false,
+      dailyPublicScreeningCap: typeof body.daily_public_screening_cap === 'number' ? body.daily_public_screening_cap : 20,
     }).returning().get()
+
+    const parsedStages = parsePipelineStages(inserted.pipelineStages)
 
     return c.json({
       id: inserted.id,
@@ -57,8 +72,64 @@ jobsRouter.post('/', async (c) => {
       location: inserted.location,
       remote: inserted.remote,
       posted_at: inserted.postedAt,
+      pipeline_stages: parsedStages,
+      auto_screen_public: Boolean(inserted.autoScreenPublic),
+      daily_public_screening_cap: inserted.dailyPublicScreeningCap,
       applicantCount: 0
     }, 201)
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+jobsRouter.put('/:id', async (c) => {
+  try {
+    const { orgId } = requireTenant(c)
+    const id = parseInt(c.req.param('id'))
+    if (isNaN(id)) return c.notFound()
+
+    const existing = await db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId)))
+    if (!existing[0]) return c.notFound()
+
+    const body = await c.req.json().catch(() => ({}))
+    const updateData: Partial<typeof jobs.$inferInsert> = {}
+
+    if (body.title && typeof body.title === 'string') updateData.title = body.title.trim()
+    if (body.location && typeof body.location === 'string') updateData.location = body.location.trim()
+    if (body.remote) updateData.remote = body.remote
+    if (body.pipeline_stages !== undefined) {
+      updateData.pipelineStages = Array.isArray(body.pipeline_stages) ? JSON.stringify(body.pipeline_stages) : null
+    }
+    if (body.auto_screen_public !== undefined) {
+      updateData.autoScreenPublic = Boolean(body.auto_screen_public)
+    }
+    if (typeof body.daily_public_screening_cap === 'number') {
+      updateData.dailyPublicScreeningCap = body.daily_public_screening_cap
+    }
+
+    const updated = await db
+      .update(jobs)
+      .set(updateData)
+      .where(and(eq(jobs.id, id), eq(jobs.organizationId, orgId)))
+      .returning()
+
+    const job = updated[0]
+    const parsedStages = parsePipelineStages(job.pipelineStages)
+
+    return c.json({
+      id: job.id,
+      organization_id: job.organizationId,
+      title: job.title,
+      location: job.location,
+      remote: job.remote,
+      posted_at: job.postedAt,
+      pipeline_stages: parsedStages,
+      auto_screen_public: Boolean(job.autoScreenPublic),
+      daily_public_screening_cap: job.dailyPublicScreeningCap,
+    })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)
   }
@@ -117,6 +188,8 @@ jobsRouter.get('/:id', async (c) => {
       }
     })
 
+    const parsedStages = parsePipelineStages(job.pipelineStages)
+
     return c.json({
       id: job.id,
       organization_id: job.organizationId,
@@ -124,6 +197,9 @@ jobsRouter.get('/:id', async (c) => {
       location: job.location,
       remote: job.remote,
       posted_at: job.postedAt,
+      pipeline_stages: parsedStages,
+      auto_screen_public: Boolean(job.autoScreenPublic),
+      daily_public_screening_cap: job.dailyPublicScreeningCap,
       applicantCount: jobApplicants.length,
       applicants: mappedApplicants
     })

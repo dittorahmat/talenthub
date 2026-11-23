@@ -22,7 +22,7 @@ import { CreditPill } from '../components/CreditPill'
 import { orgFetch, useOrg } from '../context/OrgContext'
 import { sortByScoreDesc } from '../utils/scoreRanking'
 
-const STAGES = ['Applied', 'Phone Screen', 'Technical', 'Final Interview', 'Offer', 'Hired']
+const DEFAULT_STAGES = ['Applied', 'Phone Screen', 'Technical', 'Final Interview', 'Offer', 'Hired']
 
 interface KanbanBoardProps {
   jobId: number
@@ -40,6 +40,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreBandFilter, setScoreBandFilter] = useState<string>('All')
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // Derive dynamic stages from job configuration or fallback to defaults
+  const activeStages: string[] = React.useMemo(() => {
+    if (job?.pipeline_stages && Array.isArray(job.pipeline_stages) && job.pipeline_stages.length > 0) {
+      return job.pipeline_stages.map((s: any) => s.name || String(s))
+    }
+    return DEFAULT_STAGES
+  }, [job?.pipeline_stages])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -100,6 +108,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
     }
   }
 
+  const handleScreenCandidate = async (candidate: Candidate) => {
+    try {
+      const res = await orgFetch(`/api/applicants/${candidate.id}/screen`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json() as any
+        alert(data.message || data.error || 'Gagal memproses skrining')
+        return
+      }
+      loadData()
+    } catch (err) {
+      console.error(err)
+      loadData()
+    }
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
     const found = candidates.find(c => c.id.toString() === active.id)
@@ -115,7 +138,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
     const overId = over.id.toString()
 
     // If dropped directly onto a stage column
-    if (STAGES.includes(overId)) {
+    if (activeStages.includes(overId)) {
       handleStatusChange(activeId, overId)
       return
     }
@@ -129,7 +152,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
 
   // Calculate funnel counts
   const stageCounts: Record<string, number> = {}
-  STAGES.forEach(s => {
+  activeStages.forEach(s => {
     stageCounts[s] = candidates.filter(c => c.status === s).length
   })
 
@@ -250,7 +273,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
 
         {/* Funnel Pipeline Stats */}
         <PipelineStats
-          stages={STAGES}
+          stages={activeStages}
           counts={stageCounts}
           totalCount={candidates.length}
           selectedStageFilter={selectedStageFilter}
@@ -283,12 +306,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
           >
             <div style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${STAGES.length}, minmax(240px, 1fr))`,
+              gridTemplateColumns: `repeat(${activeStages.length}, minmax(240px, 1fr))`,
               gap: '14px',
               overflowX: 'auto',
               paddingBottom: '16px'
             }}>
-              {STAGES.map((stage, idx) => {
+              {activeStages.map((stage, idx) => {
                 const columnCandidates = displayedCandidates.filter(c => c.status === stage)
                 return (
                   <StageColumn
@@ -296,12 +319,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
                     stage={stage}
                     candidates={columnCandidates}
                     jobTitle={job?.title}
-                    stages={STAGES}
-                    isLastStage={idx === STAGES.length - 1}
+                    stages={activeStages}
+                    isLastStage={idx === activeStages.length - 1}
                     onAddCandidateClick={() => setShowAddModal(true)}
                     onSelectCandidate={setSelectedCandidate}
                     onStatusChange={handleStatusChange}
                     onDeleteCandidate={handleDeleteCandidate}
+                    onScreenCandidate={handleScreenCandidate}
                   />
                 )
               })}
@@ -312,7 +336,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
                 <div style={{ opacity: 0.9, transform: 'scale(1.03)', pointerEvents: 'none' }}>
                   <CandidateCard
                     candidate={activeDragCandidate}
-                    stages={STAGES}
+                    stages={activeStages}
                     onSelect={() => {}}
                     onStatusChange={() => {}}
                     onDelete={() => {}}
@@ -327,7 +351,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
         {selectedCandidate && (
           <CandidateDetailModal
             candidate={selectedCandidate}
-            stages={STAGES}
+            stages={activeStages}
             onClose={() => {
               setSelectedCandidate(null)
               loadData()
@@ -344,7 +368,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
         {showAddModal && (
           <AddCandidateForm
             jobId={jobId}
-            stages={STAGES}
+            stages={activeStages}
             onClose={() => setShowAddModal(false)}
             onSuccess={() => {
               setShowAddModal(false)

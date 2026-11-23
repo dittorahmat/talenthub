@@ -15,6 +15,8 @@ import { onboardingRouter } from './api/onboarding'
 import { billingRouter } from './api/billing'
 import { authRouter } from './api/auth'
 import { superadminRouter } from './api/superadmin'
+import { templatesRouter } from './api/templates'
+import { publicCareersRouter } from './api/publicCareers'
 
 const app = new Hono()
 
@@ -33,6 +35,8 @@ app.get('/api/health', (c) => c.json({ status: 'ok' }))
 app.route('/api/auth', authRouter)
 app.route('/api/superadmin', superadminRouter)
 app.route('/api/organizations', organizationsRouter)
+app.route('/api/templates', templatesRouter)
+app.route('/api/public/careers', publicCareersRouter)
 app.route('/api/wallet', walletRouter)
 app.route('/api/onboarding', onboardingRouter)
 app.route('/api/billing', billingRouter)

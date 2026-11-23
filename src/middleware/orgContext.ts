@@ -46,6 +46,7 @@ const PUBLIC_ROUTE_PATTERNS: RegExp[] = [
   /^\/api\/billing\/packages$/,
   /^\/api\/billing\/webhook$/,
   /^\/api\/applicants\/public(\/|$)/,
+  /^\/api\/public\/careers(\/|$)/,
   /^\/api\/superadmin(\/|$)/,
 ]
 

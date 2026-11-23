@@ -198,6 +198,51 @@ db.exec(`
     paid_at TEXT,
     expired_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS candidate_share_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS outreach_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    subject TEXT,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS candidate_scorecards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    evaluator_id TEXT NOT NULL,
+    evaluator_name TEXT NOT NULL,
+    technical_score INTEGER NOT NULL,
+    culture_score INTEGER NOT NULL,
+    communication_score INTEGER NOT NULL,
+    recommendation TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS candidate_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `)
 
 const columns = db.prepare('PRAGMA table_info(trial_claims)').all() as Array<{ name: string }>
@@ -210,4 +255,19 @@ if (columns.length > 0) {
     db.exec('ALTER TABLE trial_claims ADD COLUMN otp_attempts INTEGER NOT NULL DEFAULT 0;')
   }
 }
+
+const jobColumns = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>
+if (jobColumns.length > 0) {
+  const names = new Set(jobColumns.map((col) => col.name))
+  if (!names.has('pipeline_stages')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN pipeline_stages TEXT;')
+  }
+  if (!names.has('auto_screen_public')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN auto_screen_public INTEGER DEFAULT 0;')
+  }
+  if (!names.has('daily_public_screening_cap')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN daily_public_screening_cap INTEGER DEFAULT 20;')
+  }
+}
+
 db.close()

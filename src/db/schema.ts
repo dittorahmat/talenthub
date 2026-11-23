@@ -14,6 +14,9 @@ export const jobs = sqliteTable('jobs', {
   location: text('location').notNull(),
   remote: text('remote').default('No'),
   postedAt: text('posted_at').notNull(),
+  pipelineStages: text('pipeline_stages'), // JSON array: [{ id, name, order, type }]
+  autoScreenPublic: integer('auto_screen_public', { mode: 'boolean' }).default(false),
+  dailyPublicScreeningCap: integer('daily_public_screening_cap').default(20),
 })
 
 export const applicants = sqliteTable('applicants', {
@@ -200,4 +203,50 @@ export const verification = sqliteTable('verification', {
   createdAt: integer('created_at', { mode: 'timestamp' }),
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
 })
+
+export const candidateShareTokens = sqliteTable('candidate_share_tokens', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  token: text('token').notNull().unique(),
+  applicantId: integer('applicant_id').notNull().references(() => applicants.id, { onDelete: 'cascade' }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+export const outreachTemplates = sqliteTable('outreach_templates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  channel: text('channel').notNull(), // 'whatsapp' | 'email'
+  subject: text('subject'),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const candidateScorecards = sqliteTable('candidate_scorecards', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  applicantId: integer('applicant_id').notNull().references(() => applicants.id, { onDelete: 'cascade' }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  evaluatorId: text('evaluator_id').notNull(),
+  evaluatorName: text('evaluator_name').notNull(),
+  technicalScore: integer('technical_score').notNull(), // 1 - 5
+  cultureScore: integer('culture_score').notNull(), // 1 - 5
+  communicationScore: integer('communication_score').notNull(), // 1 - 5
+  recommendation: text('recommendation').notNull(), // 'Strong Yes' | 'Yes' | 'Neutral' | 'No'
+  notes: text('notes'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const candidateNotes = sqliteTable('candidate_notes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  applicantId: integer('applicant_id').notNull().references(() => applicants.id, { onDelete: 'cascade' }),
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull(),
+  authorName: text('author_name').notNull(),
+  content: text('content').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
 

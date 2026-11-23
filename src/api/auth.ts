@@ -15,7 +15,8 @@ const GENERIC_AUTH_ERROR = 'Email atau kata sandi tidak valid.'
 
 const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
 const AUTH_MAX_ATTEMPTS = 10
-const authAttempts = new Map<string, { count: number; resetAt: number }>()
+// In-memory brute force cache with auto-pruning. Permitted on single-isolate auth endpoints.
+const authAttempts = new Map<string, { count: number; resetAt: number }>() // allow-in-memory
 
 function authAttemptKey(ipAddress: string, email: string): string {
   return `${ipAddress}|${email.trim().toLowerCase()}`
@@ -54,7 +55,7 @@ export interface SerializedUser {
   id: string
   name: string
   email: string
-  role: 'superadmin' | 'admin' | 'recruiter'
+  role: 'superadmin' | 'admin' | 'recruiter' | 'viewer'
   organizationId: number | null
   organization?: {
     id: number
@@ -68,7 +69,7 @@ export function serializeUser(u: any, org?: any): SerializedUser {
     id: u.id,
     name: u.name,
     email: u.email,
-    role: (u.role as 'superadmin' | 'admin' | 'recruiter') || 'recruiter',
+    role: (u.role as 'superadmin' | 'admin' | 'recruiter' | 'viewer') || 'recruiter',
     organizationId: u.organizationId ?? null,
     organization: org
       ? {

@@ -297,3 +297,13 @@ INSERT INTO sqlite_sequence VALUES('applicants',21);
 INSERT INTO sqlite_sequence VALUES('notes',42);
 INSERT INTO sqlite_sequence VALUES('activities',42);
 INSERT INTO sqlite_sequence VALUES('job_knockouts',6);
+CREATE TABLE IF NOT EXISTS candidate_share_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    applicant_id INTEGER NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_candidate_share_tokens_token ON candidate_share_tokens(token);
+

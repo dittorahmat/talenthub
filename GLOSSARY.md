@@ -79,3 +79,25 @@ Mekanisme pengamanan untuk mencegah eksploitasi pendaftaran berulang demi mendap
 - **Phone / WhatsApp OTP Verification**: Verifikasi nomor WhatsApp aktif per pendaftaran.
 - **Device & IP Fingerprint Guard**: Pembatasan klaim free trial per IP subnet dan browser device hash.
 - **Domain Deduplication**: Satu domain perusahaan (contoh: `@perusahaan.co.id`) hanya berhak mengklaim 1x paket trial untuk satu Organization pertama.
+
+---
+
+## ATS Workflow Extensions
+
+### Public Career Portal (Portal Karir Publik)
+Halaman web publik terisolasi per tenant (`/careers/:org-slug`) yang menampilkan daftar lowongan aktif dan formulir pendaftaran mandiri pelamar. Memproses upload CV dan validasi knockout questions langsung ke antrean screening tanpa login.
+
+### Candidate Self-Apply Form
+Formulir aplikasi publik tempat pelamar mengunggah berkas CV, mengisi informasi kontak, dan menjawab pertanyaan kualifikasi.
+
+### Interview Scorecard
+Instrumen penilaian terstruktur multi-evaluator di dalam profil pelamar yang memuat rubrik evaluasi kualitatif, kriteria teknis/kultural, dan rekomendasi hiring dari interviewer.
+
+### Collaborative Activity Notes
+Umpan catatan internal (*team comments*) pada profil pelamar yang memungkinkan recruiter dan hiring manager mendiskusikan kesan wawancara dan melampirkan konteks evaluasi secara internal (tersembunyi dari publik).
+
+### Outreach Message Template
+Draf pesan komunikasi siap pakai untuk saluran WhatsApp dan Email yang mendukung substitusi variabel dinamis (`{{candidate_name}}`, `{{job_title}}`, `{{company_name}}`) untuk percepatan follow-up dan penolakan santun.
+
+### Custom Pipeline Stages
+Tahapan seleksi fleksibel yang dapat dikonfigurasi per posisi lowongan kerja (menggantikan status fixed hardcoded) dengan tetap menjaga mapping ke terminal state (`Hired`, `Rejected`).

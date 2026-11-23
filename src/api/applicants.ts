@@ -1,16 +1,13 @@
 import { Hono } from 'hono'
 import { db } from '../db'
-import { jobs, applicants, notes, activities } from '../db/schema'
-import { eq, desc, and } from 'drizzle-orm'
+import { jobs, applicants, notes, activities, candidateShareTokens, candidateScorecards, candidateNotes } from '../db/schema'
+import { eq, desc, and, lt } from 'drizzle-orm'
 import { OrgEnv, requireTenant } from '../middleware/orgContext'
 import { generateInterviewQuestions, formatWhatsAppSummary } from '../utils/summaryExport'
 import { deleteDocument, getDocument } from '../services/documentStorage'
 import crypto from 'crypto'
 
 export const applicantsRouter = new Hono<OrgEnv>()
-
-// In-memory token store for public candidate intelligence sharing
-const shareTokenStore = new Map<string, { applicantId: number; expiresAt: number }>()
 
 function safeDownloadFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document'
@@ -31,30 +28,61 @@ applicantsRouter.post('/:id/share-token', async (c) => {
   const { orgId } = requireTenant(c)
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.notFound()
-  const applicant = await db.select().from(applicants).where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId))).get()
+  const applicantList = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+  const applicant = applicantList[0]
   if (!applicant) return c.notFound()
 
+  // Opportunistically prune expired share tokens from Cloudflare D1
+  try {
+    await db
+      .delete(candidateShareTokens)
+      .where(lt(candidateShareTokens.expiresAt, new Date().toISOString()))
+  } catch {}
+
   const token = crypto.randomBytes(16).toString('hex')
-  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days
-  shareTokenStore.set(token, { applicantId: id, expiresAt })
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+  const createdAt = new Date().toISOString()
+
+  await db.insert(candidateShareTokens).values({
+    token,
+    applicantId: id,
+    organizationId: orgId,
+    expiresAt,
+    createdAt,
+  })
 
   return c.json({
     token,
     shareUrl: `/share/candidate/${token}`,
-    expiresAt: new Date(expiresAt).toISOString(),
+    expiresAt,
   })
 })
 
 applicantsRouter.get('/public/share/:token', async (c) => {
   const token = c.req.param('token')
-  const entry = shareTokenStore.get(token)
-  if (!entry || entry.expiresAt < Date.now()) {
+  const tokenRows = await db
+    .select()
+    .from(candidateShareTokens)
+    .where(eq(candidateShareTokens.token, token))
+  const entry = tokenRows[0]
+  if (!entry || new Date(entry.expiresAt).getTime() < Date.now()) {
     return c.json({ error: 'Tautan telah kadaluarsa atau tidak valid' }, 404)
   }
 
-  const applicant = await db.select().from(applicants).where(eq(applicants.id, entry.applicantId)).get() as any
+  const applicantRows = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId)))
+  const applicant = applicantRows[0] as any
   if (!applicant) return c.notFound()
-  const job = await db.select().from(jobs).where(eq(jobs.id, applicant.jobId)).get() as any
+  const jobRows = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.id, applicant.jobId), eq(jobs.organizationId, entry.organizationId)))
+  const job = jobRows[0] as any
 
   const matched = applicant.screeningMatched ? applicant.screeningMatched.split(', ').filter(Boolean) : []
   const missing = applicant.screeningMissing ? applicant.screeningMissing.split(', ').filter(Boolean) : []
@@ -78,12 +106,20 @@ applicantsRouter.get('/public/share/:token', async (c) => {
  */
 applicantsRouter.get('/public/share/:token/resume', async (c) => {
   const token = c.req.param('token')
-  const entry = shareTokenStore.get(token)
-  if (!entry || entry.expiresAt < Date.now()) {
+  const tokenRows = await db
+    .select()
+    .from(candidateShareTokens)
+    .where(eq(candidateShareTokens.token, token))
+  const entry = tokenRows[0]
+  if (!entry || new Date(entry.expiresAt).getTime() < Date.now()) {
     return c.json({ error: 'Tautan telah kadaluarsa atau tidak valid' }, 404)
   }
 
-  const applicant = await db.select().from(applicants).where(eq(applicants.id, entry.applicantId)).get()
+  const applicantRows = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId)))
+  const applicant = applicantRows[0]
   if (!applicant || !applicant.resumePath) return c.notFound()
 
   const document = await getDocument(applicant.resumePath)
@@ -147,6 +183,52 @@ applicantsRouter.get('/:id/screening', async (c) => {
       ),
     })
   } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+// Trigger manual AI screening on an applicant (Ticket 05)
+applicantsRouter.post('/:id/screen', async (c) => {
+  try {
+    const { orgId } = requireTenant(c)
+    const id = parseInt(c.req.param('id'))
+    if (isNaN(id)) return c.notFound()
+
+    const applicantList = await db
+      .select()
+      .from(applicants)
+      .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+    const applicant = applicantList[0]
+    if (!applicant) return c.notFound()
+
+    if (!applicant.resumePath) {
+      return c.json({ error: 'Kandidat belum memiliki berkas resume untuk di-screen' }, 400)
+    }
+
+    const doc = await getDocument(applicant.resumePath)
+    if (!doc) {
+      return c.json({ error: 'Berkas resume kandidat tidak ditemukan di storage' }, 404)
+    }
+
+    const { candidateIntakeService } = await import('../services/candidateIntakeService')
+    const buffer = Buffer.from(doc.data)
+
+    const intakeResult = await candidateIntakeService.submitSingleResume({
+      orgId,
+      jobId: applicant.jobId,
+      applicantId: id,
+      file: {
+        filename: applicant.resumeFilename || 'resume.pdf',
+        buffer,
+      },
+    })
+
+    return c.json(intakeResult)
+  } catch (err: any) {
+    console.error('Manual screen error:', err)
+    if (err.message === 'Insufficient credit balance' || err.code === 'INSUFFICIENT_CREDIT') {
+      return c.json({ error: 'INSUFFICIENT_CREDIT', message: 'Saldo kredit tidak mencukupi untuk melakukan AI screening.' }, 402)
+    }
     return c.json({ error: err.message }, 500)
   }
 })
@@ -457,3 +539,167 @@ applicantsRouter.get('/:id/activities', async (c) => {
     return c.json({ error: err.message }, 500)
   }
 })
+
+// --- Scorecards & Team Activity Notes (Ticket 02) ---
+
+applicantsRouter.get('/:id/scorecards', async (c) => {
+  const { orgId } = requireTenant(c)
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+
+  const applicant = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+  if (!applicant[0]) return c.notFound()
+
+  const scorecards = await db
+    .select()
+    .from(candidateScorecards)
+    .where(and(eq(candidateScorecards.applicantId, id), eq(candidateScorecards.organizationId, orgId)))
+    .orderBy(desc(candidateScorecards.createdAt))
+
+  // Compute aggregate stats
+  const count = scorecards.length
+  let avgTechnical = 0
+  let avgCulture = 0
+  let avgCommunication = 0
+  let avgOverall = 0
+
+  if (count > 0) {
+    avgTechnical = Number((scorecards.reduce((sum, s) => sum + s.technicalScore, 0) / count).toFixed(1))
+    avgCulture = Number((scorecards.reduce((sum, s) => sum + s.cultureScore, 0) / count).toFixed(1))
+    avgCommunication = Number((scorecards.reduce((sum, s) => sum + s.communicationScore, 0) / count).toFixed(1))
+    avgOverall = Number(((avgTechnical + avgCulture + avgCommunication) / 3).toFixed(1))
+  }
+
+  return c.json({
+    scorecards,
+    aggregate: {
+      count,
+      avgTechnical,
+      avgCulture,
+      avgCommunication,
+      avgOverall,
+    },
+  })
+})
+
+applicantsRouter.post('/:id/scorecards', async (c) => {
+  const { orgId, user } = requireTenant(c)
+  if (user.role === 'viewer') {
+    return c.json({ error: 'Role viewer hanya memiliki akses baca (read-only)' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+
+  const applicant = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+  if (!applicant[0]) return c.notFound()
+
+  const body = await c.req.json().catch(() => ({}))
+  const { technicalScore, cultureScore, communicationScore, recommendation, notes: scorecardNotes } = body
+
+  const tech = Number(technicalScore)
+  const cult = Number(cultureScore)
+  const comm = Number(communicationScore)
+
+  if (!tech || tech < 1 || tech > 5 || !cult || cult < 1 || cult > 5 || !comm || comm < 1 || comm > 5) {
+    return c.json({ error: 'Skor rubrik (technical, culture, communication) wajib berupa angka 1 s/d 5' }, 400)
+  }
+
+  const validRecs = ['Strong Yes', 'Yes', 'Neutral', 'No']
+  if (!validRecs.includes(recommendation)) {
+    return c.json({ error: 'Rekomendasi harus salah satu dari: Strong Yes, Yes, Neutral, No' }, 400)
+  }
+
+  const now = new Date().toISOString()
+  const evaluatorId = String(user.id || 'evaluator')
+  const evaluatorName = user.name || user.email || 'Interviewer'
+
+  const inserted = await db.insert(candidateScorecards).values({
+    applicantId: id,
+    organizationId: orgId,
+    evaluatorId,
+    evaluatorName,
+    technicalScore: tech,
+    cultureScore: cult,
+    communicationScore: comm,
+    recommendation,
+    notes: scorecardNotes ? String(scorecardNotes).trim() : null,
+    createdAt: now,
+    updatedAt: now,
+  }).returning()
+
+  // Log activity
+  await db.insert(activities).values({
+    organizationId: orgId,
+    applicantId: id,
+    type: 'SCORECARD_SUBMITTED',
+    description: `${evaluatorName} memberikan evaluasi scorecard (${recommendation}, Skor Rata-rata ${((tech + cult + comm) / 3).toFixed(1)})`,
+    user: evaluatorName,
+    timestamp: now,
+  })
+
+  return c.json(inserted[0], 201)
+})
+
+applicantsRouter.get('/:id/team-notes', async (c) => {
+  const { orgId } = requireTenant(c)
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+
+  const applicant = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+  if (!applicant[0]) return c.notFound()
+
+  const notesList = await db
+    .select()
+    .from(candidateNotes)
+    .where(and(eq(candidateNotes.applicantId, id), eq(candidateNotes.organizationId, orgId)))
+    .orderBy(desc(candidateNotes.createdAt))
+
+  return c.json(notesList)
+})
+
+applicantsRouter.post('/:id/team-notes', async (c) => {
+  const { orgId, user } = requireTenant(c)
+  if (user.role === 'viewer') {
+    return c.json({ error: 'Role viewer hanya memiliki akses baca (read-only)' }, 403)
+  }
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.notFound()
+
+  const applicant = await db
+    .select()
+    .from(applicants)
+    .where(and(eq(applicants.id, id), eq(applicants.organizationId, orgId)))
+  if (!applicant[0]) return c.notFound()
+
+  const body = await c.req.json().catch(() => ({}))
+  const { content } = body
+
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return c.json({ error: 'Konten catatan tim wajib diisi' }, 400)
+  }
+
+  const now = new Date().toISOString()
+  const authorId = String(user.id || 'author')
+  const authorName = user.name || user.email || 'Tim Interviewer'
+
+  const inserted = await db.insert(candidateNotes).values({
+    applicantId: id,
+    organizationId: orgId,
+    authorId,
+    authorName,
+    content: content.trim(),
+    createdAt: now,
+  }).returning()
+
+  return c.json(inserted[0], 201)
+})
+

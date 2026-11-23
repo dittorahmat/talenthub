@@ -5,9 +5,10 @@ import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { SuperadminPortal } from './pages/SuperadminPortal'
+import { PublicCareerPage } from './pages/PublicCareerPage'
 import { AppNavbar } from './components/AppNavbar'
 
-export type AppRoute = '#/' | '#/login' | '#/register' | '#/superadmin' | '#/workspace' | '#/dashboard' | '#/jobs'
+export type AppRoute = '#/' | '#/login' | '#/register' | '#/superadmin' | '#/workspace' | '#/dashboard' | '#/jobs' | string
 
 export interface AuthUser {
   id: string
@@ -192,6 +193,10 @@ export default function App() {
         />
       </div>
     )
+  }
+
+  if (route.startsWith('#/careers')) {
+    return <PublicCareerPage />
   }
 
   if (route === '#/workspace' || route === '#/dashboard' || route === '#/jobs') {

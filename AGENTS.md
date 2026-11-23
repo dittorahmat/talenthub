@@ -13,6 +13,11 @@
   - Icon browser `favicon.ico` wajib berformat binary ICO standar, bukan teks SVG XML dengan ekstensi `.ico`.
   - Background queue handler (`queue(batch, env)`) dan request middleware wajib menginisialisasi D1 binding (`initCloudflareD1(env.DB)`) secara idempoten (cegah re-inisialisasi berulang jika instance DB sudah aktif).
   - Skema dan seed remote D1 wajib direproduksi melalui script versioned `scripts/seed-d1.ts` (`bun run seed:d1` / `bun run seed:d1:remote`) dan tersimpan di `data/d1-schema-seed.sql`.
+  - **No In-Memory State for Edge Distributed Operations**:
+    - DILARANG menggunakan in-process / in-memory collections (`new Map()`, `new Set()`, array global modul) untuk menyimpan token keamanan publik, link sharing, rate limiter IP, atau data sesi yang diakses oleh pengguna atau pihak luar.
+    - Pada arsitektur serverless Cloudflare Workers yang berjalan di edge PoP terdistribusi, memori lokal tidak tersinkronisasi antar-instance/region dan musnah saat isolate didaur ulang.
+    - Seluruh token keamanan (seperti `candidate_share_tokens`, session Better Auth, trial OTP claims) WAJIB dipersistensikan secara asinkron ke database Cloudflare D1 dengan field kedaluwarsa (`expires_at`), relasi tenant (`organization_id`), relasi entitas (`applicant_id`), dan mekanisme pembersihan kadaluarsa (opportunistic pruning).
+    - Rate limiter IP untuk endpoint publik wajib menggunakan persistensi D1/KV atau Cloudflare Turnstile token validation, dilarang menggunakan `Map` di memori isolate.
 - Untuk runtime local/test (Bun/Vite), sediakan adapter boundary transparan (`src/db/index.ts`) yang membaca binding Cloudflare saat berjalan di Worker, dan fallback ke sqlite/local filesystem hanya saat menjalankan unit test offline.
   - Parameter fungsi adapter seperti `initCloudflareD1(d1Instance: D1Database)` WAJIB menggunakan tipe data domain/Cloudflare kanonik (`D1Database`), bukan `any`.
 
@@ -27,9 +32,17 @@
   - Drizzle query yang berjalan di backend monolith Cloudflare Worker maupun test suite WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). DILARANG memanggil synchronous `.get()`, `.all()`, atau `.run()` secara langsung di route handlers maupun test fixtures karena tidak kompatibel dengan Cloudflare D1 runtime asli.
   - Autentikasi harus mengandalkan cryptographic hashing standar (seperti `bun:password` atau native PBKDF2/Argon2/bcrypt) dan dilarang keras menyimpan/membandingkan password plain text atau pseudo-string prefix.
   - Route terproteksi (seperti `/superadmin` dan API `/api/superadmin/*`) WAJIB memiliki session & role guard yang valid, menolak akses tanpa session token resmi dari Better Auth yang terverifikasi role-nya.
+- **Role-Based Collaboration Guard**:
+  - Mutasi penilaian kandidat (seperti submit Scorecard `/api/applicants/:id/scorecards` dan penambahan catatan tim `/api/applicants/:id/team-notes`) HANYA boleh dilakukan oleh role dengan hak evaluasi (`admin`, `recruiter`, `superadmin`, `owner`).
+  - Akun dengan role `viewer` bersifat *read-only* dan wajib ditolak dengan HTTP 403 jika mencoba memutasikan data evaluasi atau scorecard.
+- **Fail-Closed Scoping pada Public Shared Resources**:
+  - Seluruh query data pendukung saat meresolve token publik (`candidate_share_tokens`) WAJIB mengikatkan `organization_id` yang terverifikasi pada token tersebut (`and(eq(applicants.id, entry.applicantId), eq(applicants.organizationId, entry.organizationId))`) guna mencegah eksploitasi data leaking lintas tenant.
 - Pendaftaran free trial wajib memverifikasi keunikan domain email korporat bahkan sebelum OTP diverifikasi, serta menerapkan IP rate-limiting untuk mencegah spamming OTP pada domain yang sama.
 - Fitur batch processing wajib menyediakan endpoint dan UI aksi pembatalan antrean (`cancel`) yang otomatis me-refund sisa kredit yang belum diproses.
-- Ringkasan kandidat wajib menyediakan secure tokenized public share link di samping opsi PDF dan WhatsApp.
+- **Tokenized Public Share Scoping & Edge Resilience**:
+  - Ringkasan kandidat wajib menyediakan secure tokenized public share link di samping opsi PDF dan WhatsApp.
+  - Token publik berbagi kandidat wajib dihasilkan menggunakan CSPRNG (min 16 byte hex), disimpan secara persisten di tabel Cloudflare D1 `candidate_share_tokens` dengan masa berlaku (TTL) tegas, terisolasi ke organisasi pemilik (`organization_id`), dan terhapus otomatis saat pelamar dihapus (`ON DELETE CASCADE`).
+  - Endpoint publik (`/api/applicants/public/share/:token`) HANYA boleh mengekspos intelligence summary yang aman untuk pewawancara, dilarang membocorkan data pribadi mentah yang tidak diizinkan.
 
 ## 4. Automated Verification & Guardrails
 - Sebelum menyelesaikan pekerjaan atau membuat PR/commit, agen WAJIB menjalankan:
@@ -42,6 +55,9 @@
 - **Service Layer Drizzle Queries**:
   - Seluruh operasi query Drizzle di `src/services/` dan `src/api/` WAJIB menggunakan metode asynchronous (`await db.select()...`, `await db.insert()...`). Pemanggilan synchronous `.get()`, `.all()`, atau `.run()` dilarang keras dan otomatis diblokir oleh linter `scripts/lint-code-standards.mjs`.
 - Dokumentasi akun default pengujian dan alur Better Auth tersimpan di [docs/auth-setup.md](docs/auth-setup.md).
+- **Navigation Pointers**:
+  - Tenancy & Auth context: `src/middleware/orgContext.ts` (`requireTenant`), `src/api/auth.ts` (`SerializedUser`).
+  - Internal Operator/Superadmin Console standards: `docs/standards/internal-console.md`.
 - Peta rute halaman utama tersimpan di:
   - `/` (Landing Page) &rarr; `src/pages/LandingPage.tsx`
   - `#/login` &rarr; `src/pages/LoginPage.tsx`
@@ -49,24 +65,19 @@
   - `#/workspace` / `#/dashboard` &rarr; `src/pages/JobsDashboard.tsx`
   - `#/jobs?id=X` &rarr; `src/pages/KanbanBoard.tsx`
   - `#/superadmin` &rarr; `src/pages/SuperadminPortal.tsx` (Internal Operator Console)
-- Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`) dan hindari asumsi perintah POSIX seperti `ls`. Saat memeriksa diff git, batasi path pencarian (misal `rtk git diff HEAD -- src/ tests/`) agar hemat token.
+- Lingkungan eksekusi CLI adalah Windows PowerShell: gunakan perintah native (`Get-ChildItem`, `dir`, `Test-Path`, `Get-Content`, `Select-String`, atau `git grep`) dan hindari asumsi perintah POSIX seperti `ls`, `wc`, `cat`, atau `grep`. Saat memeriksa diff git, batasi path pencarian (misal `rtk git diff HEAD -- src/ tests/`) agar hemat token.
 
 ## 5. Frontend & UI/UX Design Standards (design-taste-frontend Skill)
 - Setiap perubahan, penambahan, dan perombakan antarmuka frontend (Landing Page, Auth, Dashboard, Kanban, Screening Inbox, Modal Detail, Summary Export, Billing, Topup, dan Superadmin) **WAJIB** menerapkan prinsip dan arahan dari skill `design-taste-frontend` (`.agents/skills/design-taste-frontend`).
 - **Internal / Operator Tools Zero-Exemption Rule**:
-  - Dilarang memperlakukan halaman internal/developer/superadmin sebagai kanvas prototyping instan bebas aturan.
-  - Halaman internal/operator wajib dibangun sebagai **Enterprise Operator Console** berstandar tinggi (mengikuti `references/app-screens.md`), dilarang menggunakan inline-style soup (`style={{ ... }}`), dilarang menggunakan emoji dekoratif pada header/tombol, dan dilarang menggunakan kartu metrik dengan angka berwarna-warni tanpa fungsi.
+  - Halaman internal/operator wajib dibangun sebagai **Enterprise Operator Console** berstandar tinggi mengikuti `docs/standards/internal-console.md` dan `references/app-screens.md`.
+  - Dilarang menggunakan inline-style soup (`style={{ ... }}`), dilarang menggunakan emoji dekoratif pada header/tombol, dan dilarang menggunakan kartu metrik dengan angka berwarna-warni tanpa fungsi.
   - **Single Shared Navigation Component (Zero-Duplication)**:
     - Navigasi atas (AppNavbar) wajib diekstrak ke dalam komponen terpadu (`src/components/AppNavbar.tsx`). Dilarang keras menulis ulang atau menduplikasi blok inline style navigasi top-bar berulang kali di `src/App.tsx`.
     - Di rute operator/superadmin (`#/superadmin`), navigasi atas wajib menampilkan indikator mode aktif (bukan tombol no-op yang mengklik tautan ke halaman dirinya sendiri) dan menyajikan hierarki single-bar yang bersih tanpa menumpuk header berulang di canvas.
   - **CSS Layering & Specificity Integrity**:
     - Seluruh custom CSS resets dan base element styling di `src/index.css` WAJIB dibungkus di dalam `@layer base { ... }`. DILARANG menaruh unlayered wildcard reset (`* { margin: 0; padding: 0; }`) di luar layer karena akan menimpa specificity utility class Tailwind v4 (`:where(.space-y-8 > :not(:last-child))`, `p-6`, tabel padding, dsb.) dan merusak layout menjadi gepeng/berdempet.
-  - **Theme & Palette Consistency**: Seluruh halaman admin/operator WAJIB menggunakan palet tema terpadu aplikasi (Light Slate Palette: background `#F8FAFC`, panel/card `bg-white`, border `border-slate-200`, aksen teal/slate), DILARANG membuat dark terminal terisolasi kecuali jika aplikasi secara eksplisit mendukung dark mode sistematis di seluruh halaman.
-  - **Spacious Layout & Anti-Dempet Standards**:
-    - **Page Shell**: Halaman konsol/dashboard wajib menggunakan layout kanvas lapang (`max-w-7xl mx-auto px-6 md:px-8 py-8 md:py-10 space-y-8`), dilarang menumpuk section tanpa margin/gap vertikal lega (`space-y-8`).
-    - **Card Framing**: Setiap panel utama (KPI, Formulir Mutasi, Tabel Data, Log Audit) WAJIB dibungkus dalam kontainer kartu mandiri (`bg-white border border-slate-200 rounded-xl shadow-xs`) dengan padding internal lega `p-6` s/d `p-8`. DILARANG menyatukan seluruh metrik atau tabel dalam satu lembar flat tanpa card frame terpisah.
-    - **Form Grid & Controls**: Formulir input wajib dipecah menjadi baris-baris terstruktur jika memiliki catatan teks/alasan audit. Dilarang menjejalkan dropdown, nominal, text description, dan tombol submit ke dalam 1 baris sempit. Tombol aksi form wajib memiliki tinggi standar yang proporsional (`py-2.5 px-4`).
-    - **Table Cell Padding**: Sel tabel data (`th`, `td`) wajib memiliki ruang vertikal dan horizontal yang nyaman (`py-4 px-6`), dilarang menggunakan padding sel yang rapat/gepeng (`py-1` s/d `py-2`) yang menyerupai spreadsheet mentah.
+  - **Theme & Layout Standards**: Rujuk `docs/standards/internal-console.md` untuk aturan detail kanvas lapang (`max-w-7xl`, `space-y-8`), card framing mandiri (`p-6` s/d `p-8`), form controls proporsional, dan table cell padding (`py-4 px-6`).
   - **Strict Domain Modeling in Views**: Seluruh struktur data tampilan (seperti list item, antrean, dan tabel transaksi) wajib memiliki interface tipe data domain kanonik yang tegas; dilarang menggunakan `any`, `any[]`, atau type assertion sembarangan (`as Type`).
   - **Scope Discipline in Refactoring**: Saat merapikan/menyeragamkan styling tampilan (UI restyle task), dilarang merombak kontrak API backend atau menambah fitur mutasi data tak diminta tanpa kesepakatan eksplisit. DILARANG mengubah nama key payload request (misal: mengubah `note` menjadi `description`) atau memalsukan tipe response (`as Type` ad-hoc) yang bertentangan dengan implementasi route backend yang sesungguhnya.
   - **Side-Effect Free Controls**: Tombol utilitas pembantu input form (seperti tombol Quick Presets angka `+50`, `+100`, dsb.) hanya bertugas mempopulasi/mengisi nilai input form secara reaktif; DILARANG memicu mutasi data / auto-submit ke backend secara implisit tanpa penekanan tombol submit/eksekusi utama oleh pengguna.
@@ -78,7 +89,7 @@
     - Formula penilaian skor CV wajib mematuhi bobot ADR secara objektif (Skill 50%, Experience 30%, Supporting Factors 20%). DILARANG memberikan nilai gratis/baseline cuma-cuma pada pilar kualifikasi jika kandidat tidak terbukti memiliki riwayat kualifikasi tersebut.
     - DILARANG menambahkan clamping/capping artifisial tanpa kesepakatan spesifikasi ADR.
   - **No AI Default Colors**: Dilarang keras menggunakan palet warna ungu/indigo instan bawaan template AI (misal `#6366F1`, `bg-indigo-50`, `border-indigo-200`) atau efek gradien murahan (`linear-gradient`) pada kartu dan modal. Seluruh aplikasi wajib patuh pada palet Light Slate & Teal semantik yang harmonis dengan Homepage.
-  - **Automated Anti-Slop Enforcement**: Skrip `scripts/lint-code-standards.mjs` secara ketat memindai seluruh direktori `src/` (komponen dan halaman) dari emoji dekoratif dan warna AI default. Pelanggaran akan membatalkan build dan pre-commit check secara otomatis.
+  - **Automated Anti-Slop Enforcement**: Skrip `scripts/lint-code-standards.mjs` secara ketat memindai seluruh direktori `src/` (komponen dan halaman) dari emoji dekoratif, warna AI default, dan module-level in-memory state pada edge. Pelanggaran akan membatalkan build dan pre-commit check secara otomatis.
 - **Spec Delivery Completeness**: Saat mengerjakan tiket vertikal (`/implement-spec` atau restyle tiket), agen WAJIB mengaudit `git diff --stat` terhadap setiap file yang disebutkan dalam kriteria penerimaan tiket (Acceptance Criteria). Dilarang menandai pekerjaan selesai jika ada target file dari tiket yang belum disentuh.
 - **Substansi & Hierarki Desain**:
   - Halaman publik / marketing (`--sector saas`): Menggunakan tipografi editorial tegas, layout asimetris yang disengaja, konten nyata/substantif, dan preview produk asli.
@@ -117,3 +128,17 @@
     1. Dapatkah pembaca membayangkannya secara visual/nyata?
     2. Dapatkah klaim tersebut dibuktikan benar atau salah?
     3. Dapatkah kompetitor menulis kalimat yang sama persis (Swap Test)? Jika ya, pertajam dengan proposisi khas TalentHub.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown under `.scratch/` (no git remote). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles map 1:1 to label/status strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `GLOSSARY.md` and `docs/adr/` (plus optional `src/*/docs/adr/`). See `docs/agents/domain.md`.

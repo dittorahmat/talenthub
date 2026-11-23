@@ -31,6 +31,7 @@ interface CandidateCardProps {
   onSelect: (candidate: Candidate) => void
   onStatusChange: (id: number, newStatus: string) => void
   onDelete: (candidate: Candidate) => void
+  onScreenCandidate?: (candidate: Candidate) => void
 }
 
 function timeAgo(dateStr: string): string {
@@ -51,7 +52,8 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
   stages,
   onSelect,
   onStatusChange,
-  onDelete
+  onDelete,
+  onScreenCandidate,
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
@@ -212,6 +214,24 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           >
             {rawScore}% · {rawBand}{derivedVerdict ? ` · ${derivedVerdict}` : ''}
           </span>
+        ) : candidate.resume_filename ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              Menunggu Skrining
+            </span>
+            {onScreenCandidate && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onScreenCandidate(candidate)
+                }}
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100"
+              >
+                Screen AI
+              </button>
+            )}
+          </div>
         ) : null}
       </div>
 

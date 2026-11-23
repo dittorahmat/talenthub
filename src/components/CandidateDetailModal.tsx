@@ -9,6 +9,8 @@ import {
 import { Candidate } from './CandidateCard'
 import { FileIcon, NoteIcon, ClockIcon, WhatsAppIcon } from './Icons'
 import { Candidate1PageSummaryModal } from './Candidate1PageSummaryModal'
+import { OutreachTemplateModal } from './OutreachTemplateModal'
+import { CandidateScorecardTab } from './CandidateScorecardTab'
 import { formatWhatsAppSummary, generateInterviewQuestions } from '../utils/summaryExport'
 import { buildWhatsAppUrl, buildEmailMailtoUrl } from '../utils/outreach'
 
@@ -65,6 +67,7 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   const [uploadError, setUploadError] = useState<{ message: string; isCreditError?: boolean } | null>(null)
   const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [outreachModalChannel, setOutreachModalChannel] = useState<'whatsapp' | 'email' | null>(null)
 
   const loadData = useCallback(() => {
     TalentHubClient.applicants.get(candidate.id)
@@ -141,12 +144,11 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
   }
 
   const handleWhatsApp = () => {
-    const url = buildWhatsAppUrl({
-      phone: candidate.phone,
-      candidateName: candidate.name,
-      jobTitle: details?.job?.title,
-    })
-    window.open(url, '_blank')
+    setOutreachModalChannel('whatsapp')
+  }
+
+  const handleEmail = () => {
+    setOutreachModalChannel('email')
   }
 
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -400,16 +402,14 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
               >
                 <WhatsAppIcon size={14} color="white" /> WhatsApp
               </button>
-              <a
-                href={buildEmailMailtoUrl({
-                  email: candidate.email,
-                  candidateName: candidate.name,
-                  jobTitle: details?.job?.title,
-                })}
+              <button
+                type="button"
+                aria-label="Kirim Email"
+                onClick={handleEmail}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 Kirim Email
-              </a>
+              </button>
               {stages.indexOf(candidate.status) < stages.length - 1 && (
                 <button
                   type="button"
@@ -826,8 +826,16 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
             </div>
           </div>
 
+          {/* Collaborative Scorecards & Team Activity Notes (Ticket 02) */}
+          <div className="border border-slate-200 rounded-xl p-4">
+            <CandidateScorecardTab
+              applicantId={candidate.id}
+              candidateName={candidate.name}
+            />
+          </div>
+
           {/* Activity Timeline Section */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px' }}>
+          <div className="border border-slate-200 rounded-xl p-4">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <ClockIcon size={16} color="#0D9488" />
               <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1E293B' }}>
@@ -888,6 +896,17 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
             interviewQuestions: details?.interview_questions
           }}
           onClose={() => setShowSummaryModal(false)}
+        />
+      )}
+
+      {outreachModalChannel && (
+        <OutreachTemplateModal
+          channel={outreachModalChannel}
+          candidateName={candidate.name}
+          candidateEmail={candidate.email}
+          candidatePhone={candidate.phone}
+          jobTitle={details?.job?.title}
+          onClose={() => setOutreachModalChannel(null)}
         />
       )}
     </div>
