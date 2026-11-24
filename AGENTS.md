@@ -58,6 +58,8 @@
 - **Navigation Pointers**:
   - Tenancy & Auth context: `src/middleware/orgContext.ts` (`requireTenant`), `src/api/auth.ts` (`SerializedUser`).
   - Internal Operator/Superadmin Console standards: `docs/standards/internal-console.md`.
+  - Router & Deep-linking: `src/App.tsx` (`parseRoute`, `ParsedRoute`).
+  - Anti-Slop Linter & Code Standards: `scripts/lint-code-standards.mjs`.
 - Peta rute halaman utama tersimpan di:
   - `/` (Landing Page) &rarr; `src/pages/LandingPage.tsx`
   - `#/login` &rarr; `src/pages/LoginPage.tsx`
@@ -112,6 +114,17 @@
   - Hindari eksekusi `node -e` inline dengan string/regex literal kompleks di CLI PowerShell untuk menghindari issue escaping kutip (`SyntaxError`).
   - Selalu prioritaskan penggunaan tool native file editing (`edit_file` atau `write_file`).
   - Hindari mencoba script headless browser ad-hoc (seperti `puppeteer`) yang tidak terdaftar di `devDependencies`; selalu prioritaskan build artifacts inspection (`dist/assets`), verifikasi linter otomatis, dan dev server preview.
+- **Responsive Layout & Visual Clipping Prevention**:
+  - Grid kartu harga (`#pricing`) dan layout kartu fitur pada Landing Page WAJIB responsif (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3` atau flex-wrap). DILARANG memaksakan grid 3 kolom statis (`repeat(3, 1fr)`) tanpa breakpoint media query yang menyebabkan horizontal clipping pada layar viewport sedang (< 1024px).
+  - Navigasi header atas wajib menyembunyikan tautan panjang pada layar mobile (`hidden md:flex`) untuk mencegah tumpang tindih dengan logo brand.
+- **Accurate Auth Error Handling in Workspaces**:
+  - Saat menangani error pemanggilan API di komponen workspace (seperti `JobsDashboard`), tangkap status `HTTP 401 Unauthorized` secara spesifik. DILARANG memunculkan pesan error koneksi backend ("backend tidak merespons") jika penyebab kegagalan adalah sesi pengguna yang telah berakhir atau belum login. Sediakan link atau tombol pengalihan langsung ke `#/login`.
+- **Router Deep-Linking & State Persistence**:
+  - Router navigasi SPA (`src/App.tsx`) wajib mengevaluasi hash parameter (seperti `#/jobs?id=X` atau `#/workspace?id=X`) melalui route parser domain (`parseRoute`), bukan parsing ad-hoc inline regex di komponen view. State pekerjaan yang sedang dibuka tetap persisten saat halaman di-refresh (F5), dan navigasi ke rute dasar tanpa ID (`#/workspace`, `#/dashboard`, atau `#/jobs`) WAJIB me-reset konteks `selectedJobId` ke `null`.
+- **Discriminative Error Modeling in UI Views**:
+  - State error pada komponen UI wajib dimodelkan secara diskriminatif (misal union type `type LoadError = 'UNAUTHORIZED' | 'NETWORK_ERROR' | null`) dan DILARANG mengandalkan substring checking pada teks error primitif (`loadError.includes('Sesi')`).
+- **Dev-Mode Seams for External Verification Flows**:
+  - Untuk alur onboarding yang membutuhkan verifikasi pihak ketiga (seperti WhatsApp OTP), lingkungan development (`process.env.NODE_ENV === 'development'`) diizinkan menyertakan `mockOtp` pada respons backend untuk pengujian manual tanpa dependensi hardware fisik, namun wajib dinonaktifkan saat menjalankan test runner otomatis (`process.env.BUN_ENV !== 'test'`).
 
 ## 6. Copywriting & Communication Standards (copywriting Skill)
 - Setiap update, penambahan, dan perombakan teks/konten antarmuka (Landing Page, modal onboarding, notifikasi, tombol CTA, error message, dan laporan eksekutif) **WAJIB** menerapkan prinsip dan arahan dari skill `copywriting` (`.agents/skills/copywriting`).

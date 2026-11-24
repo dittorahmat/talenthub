@@ -23,16 +23,59 @@ export interface AuthUser {
   } | null
 }
 
+export interface ParsedRoute {
+  raw: string
+  path: string
+  jobId: number | null
+}
+
+export function parseRoute(hash: string): ParsedRoute {
+  const raw = hash || '#/'
+  const [pathPart, queryPart] = raw.split('?')
+  let jobId: number | null = null
+
+  if (queryPart) {
+    const params = new URLSearchParams(queryPart)
+    const idParam = params.get('id')
+    if (idParam && /^\d+$/.test(idParam)) {
+      jobId = parseInt(idParam, 10)
+    }
+  }
+
+  const jobPathMatch = pathPart.match(/^#\/jobs\/(\d+)$/)
+  if (jobPathMatch) {
+    jobId = parseInt(jobPathMatch[1], 10)
+  }
+
+  return {
+    raw,
+    path: pathPart,
+    jobId,
+  }
+}
+
 export default function App() {
-  const [route, setRoute] = useState<AppRoute>(() => (window.location.hash as AppRoute) || '#/')
+  const [currentParsedRoute, setCurrentParsedRoute] = useState<ParsedRoute>(() => parseRoute(window.location.hash))
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [authChecked, setAuthChecked] = useState<boolean>(false)
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(() => parseRoute(window.location.hash).jobId)
 
   // Listen to hash route changes
   useEffect(() => {
     const handleHashChange = () => {
-      setRoute((window.location.hash as AppRoute) || '#/')
+      const parsed = parseRoute(window.location.hash)
+      setCurrentParsedRoute(parsed)
+      // If URL has specific job ID, activate it.
+      // If navigating to root workspace/dashboard or bare #/jobs without ID, reset job context.
+      if (parsed.jobId !== null) {
+        setSelectedJobId(parsed.jobId)
+      } else if (
+        parsed.path === '#/workspace' ||
+        parsed.path === '#/dashboard' ||
+        parsed.path === '#/jobs'
+      ) {
+        setSelectedJobId(null)
+      }
     }
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
@@ -76,12 +119,14 @@ export default function App() {
     window.location.hash = '#/'
   }
 
+  const currentRoute = currentParsedRoute.path
+
   // Route Dispatcher
-  if (route === '#/login') {
+  if (currentRoute === '#/login') {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />
   }
 
-  if (route === '#/register') {
+  if (currentRoute === '#/register') {
     return (
       <RegisterPage
         onSuccess={() => {
@@ -92,7 +137,7 @@ export default function App() {
   }
 
   // Superadmin Guard: verify role
-  if (route === '#/superadmin') {
+  if (currentRoute === '#/superadmin') {
     if (!authChecked) {
       return <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>Memeriksa otentikasi...</div>
     }
@@ -183,7 +228,7 @@ export default function App() {
       <div>
         <AppNavbar
           currentUser={currentUser}
-          currentRoute={route}
+          currentRoute={currentRoute}
           onLogout={handleLogout}
         />
         <SuperadminPortal
@@ -195,24 +240,40 @@ export default function App() {
     )
   }
 
-  if (route.startsWith('#/careers')) {
+  if (currentRoute.startsWith('#/careers')) {
     return <PublicCareerPage />
   }
 
-  if (route === '#/workspace' || route === '#/dashboard' || route === '#/jobs') {
+  const isWorkspaceRoute =
+    currentRoute === '#/workspace' ||
+    currentRoute === '#/dashboard' ||
+    currentRoute === '#/jobs'
+
+  if (isWorkspaceRoute) {
     return (
       <div>
         <AppNavbar
           currentUser={currentUser}
-          currentRoute={route}
+          currentRoute={currentRoute}
           onLogout={handleLogout}
         />
 
         {/* Talent Intelligence Workspace Content */}
         {selectedJobId === null ? (
-          <JobsDashboard onSelectJob={(id) => setSelectedJobId(id)} />
+          <JobsDashboard
+            onSelectJob={(id) => {
+              setSelectedJobId(id)
+              window.location.hash = `#/jobs?id=${id}`
+            }}
+          />
         ) : (
-          <KanbanBoard jobId={selectedJobId} onBack={() => setSelectedJobId(null)} />
+          <KanbanBoard
+            jobId={selectedJobId}
+            onBack={() => {
+              setSelectedJobId(null)
+              window.location.hash = '#/workspace'
+            }}
+          />
         )}
       </div>
     )

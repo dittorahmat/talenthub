@@ -126,10 +126,14 @@ onboardingRouter.post('/register', async (c) => {
       ipAddress: clientIp,
     })
 
+    // In development mode (when not executing unit/integration test suites), provide mockOtp for local manual UI testing
+    const isDevPreview = process.env.NODE_ENV === 'development' && process.env.BUN_ENV !== 'test' && !process.env.TEST_MODE
+
     return c.json({
       status: 'OTP_SENT',
       message: 'Kode OTP telah dikirimkan ke nomor WhatsApp Anda',
       phoneWhatsapp: cleanPhone,
+      ...(isDevPreview ? { mockOtp: otpCode } : {}),
     })
   } catch (err: any) {
     return c.json({ error: err.message }, 500)

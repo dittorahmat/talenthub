@@ -39,7 +39,7 @@ scanDirectory(join(process.cwd(), 'src'), (filePath) => {
         reason: `AI Slop Color Palette (Purple/Indigo default) detected in ${relPath}. Wajib gunakan Light Slate & Teal.`
       })
     }
-    // Check for inline style usage in components (excluding legacy LandingPage/LoginPage)
+    // Check for inline style usage in components and workspace pages (excluding legacy LandingPage/LoginPage)
     if (
       (relPath.includes('CandidateCard.tsx') ||
        relPath.includes('AddCandidateForm.tsx') ||
@@ -47,7 +47,10 @@ scanDirectory(join(process.cwd(), 'src'), (filePath) => {
        relPath.includes('CandidateScorecardTab.tsx') ||
        relPath.includes('OutreachTemplateModal.tsx') ||
        relPath.includes('CandidateDetailModal.tsx') ||
-       relPath.includes('PublicCareerPage.tsx')) &&
+       relPath.includes('PublicCareerPage.tsx') ||
+       relPath.includes('JobsDashboard.tsx') ||
+       relPath.includes('KanbanBoard.tsx') ||
+       relPath.includes('SuperadminPortal.tsx')) &&
       /<(a|button)\b[^>]*\bstyle=\{\{/i.test(line)
     ) {
       VIOLATIONS.push({

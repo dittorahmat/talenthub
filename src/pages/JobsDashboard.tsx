@@ -10,6 +10,8 @@ interface JobsDashboardProps {
   onSelectJob: (id: number) => void
 }
 
+type DashboardLoadError = 'UNAUTHORIZED' | 'NETWORK_ERROR' | null
+
 export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => {
   const { currentOrg } = useOrg()
   const [jobs, setJobs] = useState<Job[]>([])
@@ -19,7 +21,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
   const [showAddModal, setShowAddModal] = useState(false)
   const [newJob, setNewJob] = useState({ title: '', location: '', remote: 'No' })
   const [selectedInboxJob, setSelectedInboxJob] = useState<Job | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<DashboardLoadError>(null)
 
   useEffect(() => {
     if (!showAddModal) return
@@ -33,11 +35,20 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
     setLoadError(null)
     orgFetch('/api/jobs')
       .then(res => {
+        if (res.status === 401) {
+          throw new Error('UNAUTHORIZED')
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json() as Promise<any>
       })
       .then(data => setJobs(data))
-      .catch(() => setLoadError('Gagal memuat lowongan, backend tidak merespons.'))
+      .catch((err: Error) => {
+        if (err.message === 'UNAUTHORIZED') {
+          setLoadError('UNAUTHORIZED')
+        } else {
+          setLoadError('NETWORK_ERROR')
+        }
+      })
       .finally(() => setLoading(false))
   }
 
@@ -205,10 +216,31 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
             Memuat lowongan kerja...
           </div>
         ) : loadError ? (
-          <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #FECACA', padding: '40px 24px', textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: '16px', color: '#991B1B', fontWeight: 700 }}>{loadError}</h3>
-            <p style={{ margin: '0 0 16px', color: '#64748B', fontSize: '13px' }}>Periksa koneksi backend, lalu muat ulang daftar.</p>
-            <button type="button" onClick={loadJobs} style={{ background: '#0D9488', color: 'white', border: 'none', padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Muat ulang</button>
+          <div className="bg-white rounded-2xl border border-red-200 p-8 text-center max-w-lg mx-auto">
+            <h3 className="text-base text-red-800 font-bold mb-2">
+              {loadError === 'UNAUTHORIZED' ? 'Sesi Anda Telah Berakhir' : 'Gagal Memuat Lowongan'}
+            </h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {loadError === 'UNAUTHORIZED'
+                ? 'Silakan masuk dengan akun perusahaan Anda untuk mengakses workspace ini.'
+                : 'Periksa koneksi backend Anda, lalu coba muat ulang daftar lowongan.'}
+            </p>
+            {loadError === 'UNAUTHORIZED' ? (
+              <a
+                href="#/login"
+                className="inline-flex items-center justify-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition-colors no-underline"
+              >
+                Masuk via Login
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={loadJobs}
+                className="inline-flex items-center justify-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer border-none"
+              >
+                Muat ulang
+              </button>
+            )}
           </div>
         ) : filteredJobs.length === 0 ? (
           <div style={{

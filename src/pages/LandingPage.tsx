@@ -14,7 +14,7 @@ export function LandingPage() {
         borderBottom: '1px solid var(--border)',
         padding: '16px 32px'
       }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>{landingCopy.brand.name}</span>
             <span style={{
@@ -30,7 +30,7 @@ export function LandingPage() {
             </span>
           </div>
 
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.workflow}</a>
             <a href="#evidence" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.evidence}</a>
             <a href="#pricing" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--muted)', textDecoration: 'none' }}>{landingCopy.nav.pricing}</a>
@@ -247,7 +247,7 @@ export function LandingPage() {
       {/* Three Pillars: Substantive Capabilities */}
       <section id="evidence" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)', padding: '80px 32px' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px' }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' }}>01 / KECEPATAN</div>
               <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>Pemrosesan Antrean Cepat</h3>
@@ -286,7 +286,7 @@ export function LandingPage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Starter */}
             <div style={{
               background: 'var(--surface)',
