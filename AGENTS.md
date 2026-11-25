@@ -115,8 +115,10 @@
   - Selalu prioritaskan penggunaan tool native file editing (`edit_file` atau `write_file`).
   - Hindari mencoba script headless browser ad-hoc (seperti `puppeteer`) yang tidak terdaftar di `devDependencies`; selalu prioritaskan build artifacts inspection (`dist/assets`), verifikasi linter otomatis, dan dev server preview.
 - **Responsive Layout & Visual Clipping Prevention**:
-  - Grid kartu harga (`#pricing`) dan layout kartu fitur pada Landing Page WAJIB responsif (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3` atau flex-wrap). DILARANG memaksakan grid 3 kolom statis (`repeat(3, 1fr)`) tanpa breakpoint media query yang menyebabkan horizontal clipping pada layar viewport sedang (< 1024px).
-  - Navigasi header atas wajib menyembunyikan tautan panjang pada layar mobile (`hidden md:flex`) untuk mencegah tumpang tindih dengan logo brand.
+  - Grid kartu harga (`#pricing`) dan layout kartu fitur pada Landing Page WAJIB responsif (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3` atau flex-wrap). DILARANG memaksakan grid 3 kolom statis (`repeat(3, 1fr)`) atau `repeat(auto-fill, minmax(360px, 1fr))` tanpa breakpoint media query yang menyebabkan horizontal clipping pada layar mobile (`375px`) maupun viewport sedang (`< 1024px`).
+  - Header/toolbar halaman workspace (`JobsDashboard`, `KanbanBoard`, `LandingPage` footer & demo bar) WAJIB menggunakan `flex-col lg:flex-row` atau `flex-wrap` agar kontrol aksi tidak meluber keluar viewport mobile.
+  - Navigasi header atas (`AppNavbar`) wajib menyediakan *mobile drawer* (hamburger toggle) untuk layar `< md` dan mengekstrak helper bersama agar logika guard/aksi tidak terduplikasi antara desktop dan mobile.
+  - Saat melakukan audit `/browser` untuk responsivitas mobile pada rute terautentikasi (`#/workspace`, `#/jobs?id=X`), pastikan akun demo lokal sudah di-seed via `bun run seed` dengan `DEMO_USER_EMAIL` & `DEMO_USER_PASSWORD` bila `.env` belum tersedia.
 - **Accurate Auth Error Handling in Workspaces**:
   - Saat menangani error pemanggilan API di komponen workspace (seperti `JobsDashboard`), tangkap status `HTTP 401 Unauthorized` secara spesifik. DILARANG memunculkan pesan error koneksi backend ("backend tidak merespons") jika penyebab kegagalan adalah sesi pengguna yang telah berakhir atau belum login. Sediakan link atau tombol pengalihan langsung ke `#/login`.
 - **Router Deep-Linking & State Persistence**:

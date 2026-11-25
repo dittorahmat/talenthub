@@ -91,9 +91,10 @@ export function LandingPage() {
             {landingCopy.hero.subhead}
           </p>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <a
               href="#/register"
+              className="text-center"
               style={{
                 background: 'var(--accent)',
                 color: '#ffffff',
@@ -108,6 +109,7 @@ export function LandingPage() {
             </a>
             <a
               href="#/login"
+              className="text-center"
               style={{
                 background: 'var(--surface)',
                 color: 'var(--text)',
@@ -134,25 +136,16 @@ export function LandingPage() {
           marginTop: '48px'
         }}>
           {/* Mock Browser/Workspace Top */}
-          <div style={{
-            padding: '12px 20px',
-            background: 'var(--raised)',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '12px',
-            fontFamily: 'var(--font-mono)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#cbd5e1' }}></span>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#cbd5e1' }}></span>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#cbd5e1' }}></span>
-              <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>pipeline/senior-fullstack-engineer/screening</span>
+          <div className="px-4 sm:px-5 py-3 bg-[var(--raised)] border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+              <span className="ml-2 text-[var(--muted)] truncate">pipeline/senior-fullstack-engineer/screening</span>
             </div>
-            <div style={{ display: 'flex', gap: '16px', color: 'var(--muted)' }}>
+            <div className="flex flex-wrap items-center gap-3 text-[var(--muted)]">
               <span>ANTREAN: 0 SIAP</span>
-              <span style={{ color: 'var(--positive)' }}>BUKU BESAR: TERVERIFIKASI</span>
+              <span className="text-[var(--positive)]">BUKU BESAR: TERVERIFIKASI</span>
             </div>
           </div>
 
@@ -432,15 +425,15 @@ export function LandingPage() {
       </section>
 
       {/* Clean Footer */}
-      <footer style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)', padding: '48px 32px' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--muted)' }}>
+      <footer className="border-t border-[var(--border)] bg-[var(--surface)] px-4 sm:px-8 py-10 sm:py-12">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-[13px] text-[var(--muted)]">
           <div>
-            © 2026 TalentHub AI · Production Worker: <code style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>talenthub.tech1solusi.workers.dev</code>
+            © 2026 TalentHub AI · Production Worker: <code className="font-mono text-xs break-all">talenthub.tech1solusi.workers.dev</code>
           </div>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <a href="#/superadmin" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Portal Superadmin</a>
-            <a href="#/login" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Masuk Workspace</a>
-            <a href="#/register" style={{ color: 'var(--muted)', textDecoration: 'none' }}>Uji Coba Perusahaan Gratis</a>
+          <div className="flex flex-wrap gap-4 sm:gap-6">
+            <a href="#/superadmin" className="text-[var(--muted)] no-underline hover:text-[var(--text)]">Portal Superadmin</a>
+            <a href="#/login" className="text-[var(--muted)] no-underline hover:text-[var(--text)]">Masuk Workspace</a>
+            <a href="#/register" className="text-[var(--muted)] no-underline hover:text-[var(--text)]">Uji Coba Perusahaan Gratis</a>
           </div>
         </div>
       </footer>

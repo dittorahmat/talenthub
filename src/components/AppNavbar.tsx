@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import type { AuthUser } from '../App'
 
 interface AppNavbarProps {
@@ -8,139 +8,152 @@ interface AppNavbarProps {
 }
 
 export const AppNavbar: React.FC<AppNavbarProps> = ({ currentUser, currentRoute, onLogout }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const navigateTo = (hash: string) => {
+    setMobileMenuOpen(false)
+    window.location.hash = hash
+  }
+
+  const renderSuperadminControl = (isMobile: boolean) => {
+    if (currentUser?.role === 'superadmin' && currentRoute !== '#/superadmin') {
+      return (
+        <button
+          type="button"
+          onClick={() => navigateTo('#/superadmin')}
+          className={
+            isMobile
+              ? 'w-full text-left px-3 py-2 text-xs font-semibold text-[var(--text)] bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-control)] cursor-pointer flex items-center gap-2'
+              : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs font-semibold px-3.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer flex items-center gap-1.5'
+          }
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--positive)]" />
+          Portal Superadmin
+        </button>
+      )
+    }
+
+    if (currentRoute === '#/superadmin') {
+      return (
+        <span
+          className={
+            isMobile
+              ? 'px-3 py-1.5 text-[11px] font-mono font-semibold text-[var(--muted)] bg-[var(--raised)] border border-[var(--border)] rounded-[var(--radius-control)] uppercase tracking-wider'
+              : 'text-[11px] font-mono font-semibold text-[var(--muted)] bg-[var(--raised)] border border-[var(--border)] px-2.5 py-1 rounded-[var(--radius-control)] uppercase tracking-wider'
+          }
+        >
+          Mode Operator Konsol
+        </span>
+      )
+    }
+
+    return null
+  }
+
   return (
     <nav
       aria-label="Navigasi Utama"
-      style={{
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        padding: '12px 32px'
-      }}
+      className="bg-[var(--surface)] border-b border-[var(--border)] px-4 sm:px-8 py-3"
     >
-      <div
-        style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}
-      >
+      <div className="max-w-[1280px] mx-auto flex items-center justify-between gap-3">
         {/* Left Branding & Home Link */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <button
             type="button"
             onClick={() => {
               window.location.hash = '#/'
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 500,
-              color: 'var(--muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: 0
-            }}
+            className="hidden sm:flex items-center gap-1.5 bg-transparent border-0 text-[13px] font-medium text-[var(--muted)] cursor-pointer p-0 shrink-0 hover:text-[var(--text)]"
           >
             ← Beranda SaaS
           </button>
-          <span style={{ height: '14px', width: '1px', background: 'var(--border)' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)' }}>
+          <span className="hidden sm:inline-block h-3.5 w-px bg-[var(--border)] shrink-0" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-base font-bold tracking-tight text-[var(--text)] shrink-0">
               TalentHub
             </span>
-            <span
-              style={{
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                background: 'var(--pill-neutral-bg)',
-                color: 'var(--pill-neutral-ink)',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--border)'
-              }}
-            >
+            <span className="hidden md:inline-block text-[11px] font-mono bg-[var(--pill-neutral-bg)] text-[var(--pill-neutral-ink)] px-2 py-0.5 rounded border border-[var(--border)] shrink-0">
               v2.4 · Cloudflare Native
             </span>
           </div>
         </div>
 
-        {/* Right Actions & Session Info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Superadmin shortcut (only shown in workspace/dashboard when user has superadmin role) */}
-          {currentUser?.role === 'superadmin' && currentRoute !== '#/superadmin' && (
-            <button
-              type="button"
-              onClick={() => {
-                window.location.hash = '#/superadmin'
-              }}
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '12px',
-                fontWeight: 600,
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-control)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--positive)' }} />
-              Portal Superadmin
-            </button>
-          )}
-
-          {/* Superadmin active page indicator badge */}
-          {currentRoute === '#/superadmin' && (
-            <span
-              style={{
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                color: 'var(--muted)',
-                background: 'var(--raised)',
-                border: '1px solid var(--border)',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-control)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
-              }}
-            >
-              Mode Operator Konsol
-            </span>
-          )}
+        {/* Desktop Right Actions & Session Info */}
+        <div className="hidden md:flex items-center gap-4">
+          {renderSuperadminControl(false)}
 
           {currentUser && (
-            <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
-              Halo, <strong style={{ color: 'var(--text)' }}>{currentUser.name}</strong>
+            <span className="text-[13px] text-[var(--muted)]">
+              Halo, <strong className="text-[var(--text)]">{currentUser.name}</strong>
             </span>
           )}
 
           <button
             type="button"
             onClick={onLogout}
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              color: 'var(--text)',
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-control)',
-              cursor: 'pointer'
-            }}
+            className="bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs font-medium px-3.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer"
           >
             Keluar
           </button>
         </div>
+
+        {/* Mobile Hamburger Toggle */}
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
+          aria-expanded={mobileMenuOpen}
+          className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] cursor-pointer"
+        >
+          {mobileMenuOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          )}
+        </button>
       </div>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden mt-3 pt-3 border-t border-[var(--border)] flex flex-col gap-2.5">
+          {currentUser && (
+            <div className="text-xs text-[var(--muted)] px-1">
+              Masuk sebagai <strong className="text-[var(--text)]">{currentUser.name}</strong>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false)
+              window.location.hash = '#/'
+            }}
+            className="w-full text-left px-3 py-2 text-xs font-medium text-[var(--text)] bg-[var(--raised)] border border-[var(--border)] rounded-[var(--radius-control)] cursor-pointer"
+          >
+            ← Beranda SaaS
+          </button>
+
+          {renderSuperadminControl(true)}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false)
+              onLogout()
+            }}
+            className="w-full text-left px-3 py-2 text-xs font-medium text-[var(--negative)] bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-control)] cursor-pointer"
+          >
+            Keluar
+          </button>
+        </div>
+      )}
     </nav>
   )
 }

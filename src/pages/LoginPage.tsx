@@ -156,15 +156,17 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         </form>
 
         {/* Register & Return Link */}
-        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)' }}>
-          Belum memiliki workspace perusahaan?{' '}
-          <a href="#/register" style={{ color: 'var(--chart-primary)', fontWeight: 600 }}>
-            Daftar Uji Coba Gratis
-          </a>
-          <span style={{ margin: '0 8px' }}>·</span>
-          <a href="#/" style={{ color: 'var(--muted)' }}>
-            Kembali ke Beranda
-          </a>
+        <div className="mt-6 text-center text-[13px] text-[var(--muted)] flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
+          <span>Belum memiliki workspace perusahaan?</span>
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <a href="#/register" className="text-[var(--chart-primary)] font-semibold py-1 px-1 whitespace-nowrap">
+              Daftar Uji Coba Gratis
+            </a>
+            <span aria-hidden="true">·</span>
+            <a href="#/" className="text-[var(--muted)] py-1 px-1 whitespace-nowrap">
+              Kembali ke Beranda
+            </a>
+          </div>
         </div>
       </div>
     </div>

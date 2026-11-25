@@ -40,6 +40,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreBandFilter, setScoreBandFilter] = useState<string>('All')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [activeMobileStage, setActiveMobileStage] = useState<string>(DEFAULT_STAGES[0])
 
   // Derive dynamic stages from job configuration or fallback to defaults
   const activeStages: string[] = React.useMemo(() => {
@@ -168,16 +169,36 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
     return matchesFilter && matchesBand && matchesSearch
   })
 
+  const renderStageColumn = (stage: string, idx: number, keyPrefix: string) => {
+    const columnCandidates = displayedCandidates.filter(c => c.status === stage)
+    return (
+      <StageColumn
+        key={`${keyPrefix}${stage}`}
+        stage={stage}
+        candidates={columnCandidates}
+        jobTitle={job?.title}
+        stages={activeStages}
+        isLastStage={idx === activeStages.length - 1}
+        onAddCandidateClick={() => setShowAddModal(true)}
+        onSelectCandidate={setSelectedCandidate}
+        onStatusChange={handleStatusChange}
+        onDeleteCandidate={handleDeleteCandidate}
+        onScreenCandidate={handleScreenCandidate}
+      />
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', padding: '24px' }}>
       <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
         {/* Navigation / Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-5">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <button
               type="button"
               aria-label="Kembali ke dashboard"
               onClick={onBack}
+              className="whitespace-nowrap shrink-0"
               style={{
                 background: 'white',
                 border: '1px solid #CBD5E1',
@@ -194,7 +215,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
             >
               ← Kembali ke Dashboard
             </button>
-            <div>
+            <div className="min-w-0">
               <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0F172A' }}>
                 {job?.title || 'Memuat Posisi...'}
               </h1>
@@ -204,8 +225,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 sm:flex-initial min-w-[180px]">
               <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
                 <SearchIcon size={14} color="#94A3B8" />
               </span>
@@ -214,12 +235,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
                 placeholder="Cari kandidat atau keahlian..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
+                className="w-full sm:w-[200px] box-border"
                 style={{
                   padding: '8px 12px 8px 32px',
                   border: '1px solid #CBD5E1',
                   borderRadius: '8px',
                   fontSize: '13px',
-                  width: '200px',
                   outline: 'none',
                   background: 'white'
                 }}
@@ -304,31 +325,67 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ jobId, onBack }) => {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${activeStages.length}, minmax(240px, 1fr))`,
-              gap: '14px',
-              overflowX: 'auto',
-              paddingBottom: '16px'
-            }}>
-              {activeStages.map((stage, idx) => {
-                const columnCandidates = displayedCandidates.filter(c => c.status === stage)
-                return (
-                  <StageColumn
-                    key={stage}
-                    stage={stage}
-                    candidates={columnCandidates}
-                    jobTitle={job?.title}
-                    stages={activeStages}
-                    isLastStage={idx === activeStages.length - 1}
-                    onAddCandidateClick={() => setShowAddModal(true)}
-                    onSelectCandidate={setSelectedCandidate}
-                    onStatusChange={handleStatusChange}
-                    onDeleteCandidate={handleDeleteCandidate}
-                    onScreenCandidate={handleScreenCandidate}
-                  />
-                )
-              })}
+            {/* Mobile Stage Tabs (< md) */}
+            <div className="md:hidden space-y-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Stage Pipeline">
+                {activeStages.map((stage) => {
+                  const count = displayedCandidates.filter(c => c.status === stage).length
+                  const isActive = (activeStages.includes(activeMobileStage) ? activeMobileStage : activeStages[0]) === stage
+                  const renderStageColumn = (stage: string, idx: number, keyPrefix: string) => {
+    const columnCandidates = displayedCandidates.filter(c => c.status === stage)
+    return (
+      <StageColumn
+        key={`${keyPrefix}${stage}`}
+        stage={stage}
+        candidates={columnCandidates}
+        jobTitle={job?.title}
+        stages={activeStages}
+        isLastStage={idx === activeStages.length - 1}
+        onAddCandidateClick={() => setShowAddModal(true)}
+        onSelectCandidate={setSelectedCandidate}
+        onStatusChange={handleStatusChange}
+        onDeleteCandidate={handleDeleteCandidate}
+        onScreenCandidate={handleScreenCandidate}
+      />
+    )
+  }
+
+  return (
+                    <button
+                      key={stage}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setActiveMobileStage(stage)}
+                      className={`shrink-0 px-3 py-2 rounded-[var(--radius-control)] text-xs font-semibold border cursor-pointer flex items-center gap-1.5 ${
+                        isActive
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                          : 'bg-[var(--surface)] text-[var(--text)] border-[var(--border)]'
+                      }`}
+                    >
+                      <span>{stage}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isActive ? 'bg-white/20 text-white' : 'bg-[var(--raised)] text-[var(--muted)]'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {(() => {
+                const currentStage = activeStages.includes(activeMobileStage) ? activeMobileStage : activeStages[0]
+                return renderStageColumn(currentStage, activeStages.indexOf(currentStage), 'mobile-')
+              })()}
+            </div>
+
+            {/* Desktop Multi-Column Kanban (>= md) */}
+            <div
+              className="hidden md:grid gap-3.5 overflow-x-auto pb-4"
+              style={{
+                gridTemplateColumns: `repeat(${activeStages.length}, minmax(240px, 1fr))`
+              }}
+            >
+              {activeStages.map((stage, idx) => renderStageColumn(stage, idx, ''))}
             </div>
 
             <DragOverlay>

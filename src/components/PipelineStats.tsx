@@ -54,11 +54,7 @@ export const PipelineStats: React.FC<PipelineStatsProps> = ({
         )}
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${stages.length}, 1fr)`,
-        gap: '8px'
-      }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {stages.map((stage) => {
           const count = counts[stage] || 0
           const percentage = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0

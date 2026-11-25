@@ -99,10 +99,10 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--ground)', padding: '40px 32px' }}>
-      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+    <div className="min-h-screen bg-[var(--ground)] px-4 sm:px-8 py-6 sm:py-10">
+      <div className="max-w-[1280px] mx-auto">
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
@@ -130,13 +130,14 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
               TalentHub oleh PT. Sirius Global Technologies · Sistem Pelacakan & Skrining Pelamar
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <CreditPill />
             <WorkspaceSwitcher />
             <button
               type="button"
               aria-label="Buat lowongan baru"
               onClick={() => setShowAddModal(true)}
+              className="whitespace-nowrap"
               style={{
                 background: 'var(--accent)',
                 color: 'white',
@@ -157,16 +158,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
         </div>
 
         {/* Filter / Search Bar */}
-        <div style={{
-          background: 'var(--surface)',
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-card)',
-          border: '1px solid var(--border)',
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'center',
-          marginBottom: '28px'
-        }}>
+        <div className="bg-[var(--surface)] p-3 sm:px-4 rounded-[var(--radius-card)] border border-[var(--border)] flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-7">
           <div style={{ flex: 1, position: 'relative' }}>
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
               <SearchIcon size={16} color="var(--muted)" />
@@ -279,11 +271,7 @@ export const JobsDashboard: React.FC<JobsDashboardProps> = ({ onSelectJob }) => 
             </button>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-            gap: '20px'
-          }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredJobs.map(job => (
               <JobCard key={job.id} job={job} onSelect={onSelectJob} onDelete={handleDeleteJob} onOpenInbox={(j) => setSelectedInboxJob(j)} />
             ))}

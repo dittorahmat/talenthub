@@ -147,21 +147,20 @@ export const TrialOnboardingModal: React.FC<TrialOnboardingModalProps> = ({
           style={{
             position: 'absolute',
             top: '20px',
-            right: '20px',
-            background: 'none',
-            border: 'none',
-            fontSize: '18px',
-            color: 'var(--muted)',
-            cursor: 'pointer',
-            padding: '4px',
+            right: '16px',
           }}
+          aria-label="Tutup"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-[var(--muted)] hover:bg-slate-100 cursor-pointer border-0 bg-transparent"
         >
-          
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
 
         {/* Modal Header */}
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <div style={{ marginBottom: '24px', paddingRight: '28px' }}>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span style={{
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',

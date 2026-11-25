@@ -202,6 +202,30 @@ testLines.forEach((line, idx) => {
   }
 })
 
+// 5. Enforce LF line endings and block mobile-breaking static minmax(>=320px) grids in src/
+scanDirectory(join(process.cwd(), 'src'), (filePath) => {
+  if (!/\.(ts|tsx|css)$/.test(filePath)) return
+  const content = readFileSync(filePath, 'utf-8')
+  if (content.includes('\r\n')) {
+    VIOLATIONS.push({
+      file: filePath,
+      line: 1,
+      reason: 'CRLF line ending detected. Seluruh file di src/ wajib menggunakan LF.'
+    })
+  }
+  if (filePath.endsWith('.tsx')) {
+    content.split('\n').forEach((line, idx) => {
+      if (/minmax\(\s*(3[2-9]\d|[4-9]\d\d)px/.test(line) && !line.includes('// allow-wide-minmax')) {
+        VIOLATIONS.push({
+          file: filePath,
+          line: idx + 1,
+          reason: 'Mobile-breaking static grid minmax(>=320px) detected. Gunakan Tailwind responsive grid (grid-cols-1 md:grid-cols-2 lg:grid-cols-3).'
+        })
+      }
+    })
+  }
+})
+
 if (VIOLATIONS.length > 0) {
   console.error('\n❌ Architecture & Code Standards Violations Found:')
   for (const v of VIOLATIONS) {
